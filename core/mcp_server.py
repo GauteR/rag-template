@@ -73,6 +73,8 @@ class IndexMarkdownInput(BaseModel):
 
 
 class IndexPdfInput(BaseModel):
+    """No-argument input model required by MCP tool signatures."""
+
     model_config = ConfigDict(extra="forbid")
 
 
@@ -169,11 +171,10 @@ def create_mcp_server(
 
     @server.tool(
         name="rag_index_pdf",
-        annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True},
+        annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False},
     )
-    async def rag_index_pdf(params: IndexPdfInput) -> dict[str, Any]:
+    async def rag_index_pdf(_params: IndexPdfInput) -> dict[str, Any]:
         """Index PDF content in the Proxy-Pointer RAG service."""
-        del params
         return await client.index_pdf()
 
     @server.tool(

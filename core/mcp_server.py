@@ -200,7 +200,9 @@ def create_mcp_server(
         try:
             content = base64.b64decode(params.content_base64, validate=True)
         except (ValueError, binascii.Error) as exc:
-            raise RuntimeError("Invalid base64 in content_base64.") from exc
+            raise RuntimeError(
+                "Failed to decode content_base64: invalid base64 format."
+            ) from exc
         return await client.index_pdf(
             filename=params.filename,
             content=content,

@@ -133,7 +133,7 @@ async def index_pdf(
     if len(content) > max_bytes:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail="PDF payload exceeds MAX_UPLOAD_MB",
+            detail=f"PDF payload exceeds maximum size of {container.settings.max_upload_mb} MB",
         )
 
     try:

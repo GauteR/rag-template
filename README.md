@@ -180,6 +180,9 @@ EMBEDDING_DIMENSION=8
 `POST /v1/index/pdf` is enabled by default through `ENABLE_LLAMAPARSE=true`.
 
 The route accepts multipart form data and runs: PDF bytes → Markdown → existing indexing pipeline.
+With `LLAMA_CLOUD_API_KEY` configured (and the `llamaparse` extra installed), extraction uses
+LlamaParse for richer content such as math, tables, images, and complex layout. Without that
+configuration, it falls back to local text extraction with `pypdf`.
 
 Example:
 

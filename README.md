@@ -1,4 +1,4 @@
-# rag-template
+# Proxy Pointer RAG Template
 
 A FastAPI template for a Proxy-Pointer RAG service.
 

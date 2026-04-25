@@ -48,13 +48,13 @@ def test_api_key_header_is_required_when_configured(tmp_path) -> None:
     assert authorized.status_code == 200
 
 
-def test_index_pdf_is_disabled_by_default(tmp_path) -> None:
+def test_index_pdf_is_enabled_by_default(tmp_path) -> None:
     container = AppContainer(settings=Settings(index_dir=tmp_path))
     client = TestClient(create_app(container=container))
 
     response = client.post("/v1/index/pdf")
 
-    assert response.status_code == 404
+    assert response.status_code == 501
 
 
 def test_index_pdf_requires_pdf_extractor_when_enabled(tmp_path) -> None:

@@ -121,7 +121,7 @@ EMBEDDING_DIMENSION=8
 
 ENABLE_LLM_NOISE_FILTER=false
 ENABLE_LLM_RERANKER=false
-ENABLE_LLAMAPARSE=false
+ENABLE_LLAMAPARSE=true
 ENABLE_BENCHMARK_JUDGE=false
 
 INDEX_DIR=.index
@@ -177,10 +177,9 @@ EMBEDDING_DIMENSION=8
 
 ## PDF Indexing
 
-`POST /v1/index/pdf` is behind `ENABLE_LLAMAPARSE`.
+`POST /v1/index/pdf` is enabled by default through `ENABLE_LLAMAPARSE=true`.
 
-The route is intentionally disabled by default. Enabling it requires a configured `PdfExtractorPort`
-adapter and `LLAMA_CLOUD_API_KEY`.
+The route currently requires a configured `PdfExtractorPort` adapter and `LLAMA_CLOUD_API_KEY`.
 
 ## Infrastructure Integrations
 

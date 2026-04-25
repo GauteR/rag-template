@@ -2,16 +2,16 @@ from __future__ import annotations
 
 from functools import cached_property
 
-from rag_template_core.application.indexing.chunking import StructureGuidedChunker
-from rag_template_core.application.indexing.markdown_parser import MarkdownSkeletonParser
-from rag_template_core.application.indexing.noise_filter import HeuristicNoiseFilter, LlmNoiseFilter
-from rag_template_core.application.indexing.use_case import IndexMarkdownUseCase
-from rag_template_core.application.query.use_case import QueryUseCase
-from rag_template_core.config.settings import Settings
-from rag_template_core.infrastructure.embeddings.registry import embedding_registry
-from rag_template_core.infrastructure.llm.registry import llm_registry
-from rag_template_core.infrastructure.persistence.faiss_vector_store import FaissVectorStore
-from rag_template_core.infrastructure.persistence.json_section_store import JsonSectionStore
+from core.application.indexing.chunking import StructureGuidedChunker
+from core.application.indexing.markdown_parser import MarkdownSkeletonParser
+from core.application.indexing.noise_filter import HeuristicNoiseFilter, LlmNoiseFilter
+from core.application.indexing.use_case import IndexMarkdownUseCase
+from core.application.query.use_case import QueryUseCase
+from core.config.settings import Settings
+from core.infrastructure.embeddings.registry import embedding_registry
+from core.infrastructure.llm.registry import llm_registry
+from core.infrastructure.persistence.faiss_vector_store import FaissVectorStore
+from core.infrastructure.persistence.json_section_store import JsonSectionStore
 
 
 class AppContainer:

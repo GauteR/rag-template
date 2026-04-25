@@ -1,17 +1,17 @@
 import pytest
 
-from rag_template_core.application.indexing.chunking import StructureGuidedChunker
-from rag_template_core.application.indexing.markdown_parser import MarkdownSkeletonParser
-from rag_template_core.application.indexing.noise_filter import HeuristicNoiseFilter
-from rag_template_core.application.indexing.use_case import IndexMarkdownUseCase
-from rag_template_core.application.ports.embeddings import EmbedderPort
-from rag_template_core.application.ports.llm import LlmPort
-from rag_template_core.application.query.use_case import QueryUseCase
-from rag_template_core.domain.models import Section
-from rag_template_core.infrastructure.persistence.in_memory_section_store import (
+from core.application.indexing.chunking import StructureGuidedChunker
+from core.application.indexing.markdown_parser import MarkdownSkeletonParser
+from core.application.indexing.noise_filter import HeuristicNoiseFilter
+from core.application.indexing.use_case import IndexMarkdownUseCase
+from core.application.ports.embeddings import EmbedderPort
+from core.application.ports.llm import LlmPort
+from core.application.query.use_case import QueryUseCase
+from core.domain.models import Section
+from core.infrastructure.persistence.in_memory_section_store import (
     InMemorySectionStore,
 )
-from rag_template_core.infrastructure.persistence.in_memory_vector_store import (
+from core.infrastructure.persistence.in_memory_vector_store import (
     InMemoryVectorStore,
 )
 

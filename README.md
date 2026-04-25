@@ -172,8 +172,8 @@ Minimal Python usage:
 ```python
 from pathlib import Path
 
-from rag_template_core.application.benchmarking.models import BenchmarkQuestion, ModelProfile
-from rag_template_core.application.benchmarking.runner import BenchmarkRunner
+from core.application.benchmarking.models import BenchmarkQuestion, ModelProfile
+from core.application.benchmarking.runner import BenchmarkRunner
 
 # Provide a QueryUseCase instance wired with the providers you want to compare.
 runner = BenchmarkRunner(query_use_case_factory=lambda profile: query_use_case)

@@ -1,5 +1,5 @@
-from rag_template_core.application.indexing.chunking import StructureGuidedChunker
-from rag_template_core.application.indexing.markdown_parser import MarkdownSkeletonParser
+from core.application.indexing.chunking import StructureGuidedChunker
+from core.application.indexing.markdown_parser import MarkdownSkeletonParser
 
 
 def test_markdown_parser_builds_heading_tree_and_breadcrumbs() -> None:

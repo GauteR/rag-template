@@ -1,8 +1,8 @@
 import pytest
 
-from rag_template_core.config.settings import Settings
-from rag_template_core.infrastructure.embeddings.registry import embedding_registry
-from rag_template_core.infrastructure.llm.registry import llm_registry
+from core.config.settings import Settings
+from core.infrastructure.embeddings.registry import embedding_registry
+from core.infrastructure.llm.registry import llm_registry
 
 
 def test_default_registries_include_local_and_http_provider_ids() -> None:

@@ -1,10 +1,10 @@
-from rag_template_core.application.benchmarking.models import BenchmarkQuestion, ModelProfile
-from rag_template_core.application.benchmarking.runner import BenchmarkRunner
+from core.application.benchmarking.models import BenchmarkQuestion, ModelProfile
+from core.application.benchmarking.runner import BenchmarkRunner
 
 
 class StaticQueryUseCase:
     def execute(self, question: str, k_recall: int, k_candidates: int, k_final: int):
-        from rag_template_core.application.query.models import QueryResponse, QuerySource
+        from core.application.query.models import QueryResponse, QuerySource
 
         return QueryResponse(
             answer=f"answer: {question}",

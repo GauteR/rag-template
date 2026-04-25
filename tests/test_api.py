@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 
 from app.container import AppContainer
 from app.main import create_app
-from rag_template_core.config.settings import Settings
+from core.config.settings import Settings
 
 
 def test_health_reports_configured_providers(tmp_path) -> None:

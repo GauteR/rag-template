@@ -25,7 +25,7 @@ faiss = ["faiss-cpu>=1.8"]
 llamaparse = ["llama-cloud-services>=0.6"]
 
 [tool.setuptools.packages.find]
-include = ["app*", "rag_template_core*"]
+include = ["app*", "core*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

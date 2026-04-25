@@ -1,7 +1,7 @@
 import pytest
 
-from rag_template_core.domain.models import VectorRecord
-from rag_template_core.infrastructure.persistence.faiss_vector_store import (
+from core.domain.models import VectorRecord
+from core.infrastructure.persistence.faiss_vector_store import (
     FaissVectorStore,
     normalize_vector,
 )

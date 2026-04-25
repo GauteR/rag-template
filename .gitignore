@@ -54,7 +54,7 @@ poetry.lock
 benchmarks/out/
 .index/
 # Vector DB index directory _configurable_, but add common path:
-rag_template_core/infrastructure/vectorstore/faiss_index/
+core/infrastructure/vectorstore/faiss_index/
 
 # Local review artifacts
 code-review-report.md
@@ -67,3 +67,17 @@ local_data/
 *.bak
 *.swp
 *.tmp
+
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.vscode/
+.idea/
+.sublime-workspace
+.sublime-project
+.DS_Store
+Thumbs.db
+*.log
+*.ipynb_checkpoints

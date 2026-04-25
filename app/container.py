@@ -9,6 +9,7 @@ from core.application.indexing.use_case import IndexMarkdownUseCase
 from core.application.query.use_case import QueryUseCase
 from core.config.settings import Settings
 from core.infrastructure.embeddings.registry import embedding_registry
+from core.infrastructure.extraction.llamaparse_pdf_extractor import LlamaParsePdfExtractor
 from core.infrastructure.llm.registry import llm_registry
 from core.infrastructure.persistence.faiss_vector_store import FaissVectorStore
 from core.infrastructure.persistence.json_section_store import JsonSectionStore
@@ -42,6 +43,10 @@ class AppContainer:
     @cached_property
     def section_store(self) -> JsonSectionStore:
         return JsonSectionStore(path=self.settings.index_dir / "sections.json")
+
+    @cached_property
+    def pdf_extractor(self) -> LlamaParsePdfExtractor:
+        return LlamaParsePdfExtractor(api_key=self.settings.llama_cloud_api_key)
 
     def index_markdown_use_case(self) -> IndexMarkdownUseCase:
         return IndexMarkdownUseCase(

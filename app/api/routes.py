@@ -1,6 +1,19 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from pathlib import Path
+from typing import Annotated
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Request,
+    UploadFile,
+    status,
+)
 
 from app.api.schemas import (
     HealthResponse,
@@ -90,13 +103,53 @@ def query(
 
 
 @router.post("/index/pdf")
-def index_pdf(container: AppContainer = ContainerDependency) -> dict[str, str]:
+async def index_pdf(
+    file: Annotated[UploadFile, File(...)],
+    doc_id: Annotated[str | None, Form()] = None,
+    container: AppContainer = ContainerDependency,
+) -> IndexMarkdownResponse:
     if not container.settings.enable_llamaparse:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="PDF indexing is disabled. Set ENABLE_LLAMAPARSE=true to enable it.",
         )
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="PDF indexing requires a configured PdfExtractorPort adapter.",
+
+    filename = file.filename or "document.pdf"
+    resolved_doc_id = (doc_id or Path(filename).stem).strip()
+    if not resolved_doc_id:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="doc_id is required when the uploaded file has no filename.",
+        )
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="PDF payload is empty.",
+        )
+
+    max_bytes = container.settings.max_upload_mb * 1024 * 1024
+    if len(content) > max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="PDF payload exceeds MAX_UPLOAD_MB",
+        )
+
+    try:
+        markdown = container.pdf_extractor.extract_markdown(filename=filename, content=content)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=str(exc),
+        ) from exc
+
+    result = container.index_markdown_use_case().execute(
+        doc_id=resolved_doc_id,
+        markdown=markdown,
+    )
+    return IndexMarkdownResponse(
+        doc_id=result.doc_id,
+        indexed_chunks=result.indexed_chunks,
+        indexed_sections=result.indexed_sections,
     )

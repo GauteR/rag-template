@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -73,9 +75,19 @@ class IndexMarkdownInput(BaseModel):
 
 
 class IndexPdfInput(BaseModel):
-    """No-argument input model required by MCP tool signatures."""
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    model_config = ConfigDict(extra="forbid")
+    filename: str = Field(..., min_length=1, description="PDF filename, e.g. manual.pdf.")
+    content_base64: str = Field(
+        ...,
+        min_length=1,
+        description="Base64-encoded PDF bytes.",
+    )
+    doc_id: str | None = Field(
+        default=None,
+        min_length=1,
+        description="Optional document identifier. Defaults to filename stem.",
+    )
 
 
 class QueryInput(BaseModel):
@@ -102,8 +114,18 @@ class RagApiClient:
             json={"doc_id": doc_id, "markdown": markdown},
         )
 
-    async def index_pdf(self) -> dict[str, Any]:
-        return await self._request("POST", "/v1/index/pdf")
+    async def index_pdf(
+        self,
+        *,
+        filename: str,
+        content: bytes,
+        doc_id: str | None,
+    ) -> dict[str, Any]:
+        data: dict[str, str] = {}
+        if doc_id is not None:
+            data["doc_id"] = doc_id
+        files = {"file": (filename, content, "application/pdf")}
+        return await self._request("POST", "/v1/index/pdf", data=data, files=files)
 
     async def query(
         self,
@@ -173,9 +195,17 @@ def create_mcp_server(
         name="rag_index_pdf",
         annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True},
     )
-    async def rag_index_pdf(_params: IndexPdfInput) -> dict[str, Any]:
-        """Call PDF indexing; endpoint requires ENABLE_LLAMAPARSE=true and a PdfExtractorPort."""
-        return await client.index_pdf()
+    async def rag_index_pdf(params: IndexPdfInput) -> dict[str, Any]:
+        """Index PDF bytes as Markdown in the standard indexing pipeline."""
+        try:
+            content = base64.b64decode(params.content_base64, validate=True)
+        except (ValueError, binascii.Error) as exc:
+            raise RuntimeError("Invalid base64 in content_base64.") from exc
+        return await client.index_pdf(
+            filename=params.filename,
+            content=content,
+            doc_id=params.doc_id,
+        )
 
     @server.tool(
         name="rag_query",

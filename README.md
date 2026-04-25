@@ -179,9 +179,18 @@ EMBEDDING_DIMENSION=8
 
 `POST /v1/index/pdf` is enabled by default through `ENABLE_LLAMAPARSE=true`.
 
-The current route returns `501 Not Implemented` unless a `PdfExtractorPort` adapter is wired in.
-If that adapter is LlamaParse-backed, it is expected to require `LLAMA_CLOUD_API_KEY`; the API route
-itself does not currently check that variable.
+The route accepts multipart form data and runs: PDF bytes → Markdown → existing indexing pipeline.
+With `LLAMA_CLOUD_API_KEY` configured (and the `llamaparse` extra installed), extraction uses
+LlamaParse for richer content such as math, tables, images, and complex layout. Without that
+configuration, it falls back to local text extraction with `pypdf`.
+
+Example:
+
+```bash
+curl -X POST http://127.0.0.1:8000/v1/index/pdf \
+  -F "doc_id=manual" \
+  -F "file=@manual.pdf;type=application/pdf"
+```
 
 ## Infrastructure Integrations
 
@@ -258,8 +267,8 @@ Tools exposed:
 
 - `rag_health`: checks `GET /v1/health`.
 - `rag_index_markdown`: indexes Markdown through `POST /v1/index/markdown`.
-- `rag_index_pdf`: calls `POST /v1/index/pdf` (returns 404 when `ENABLE_LLAMAPARSE=false`,
-  and currently returns 501 until a `PdfExtractorPort` adapter is wired).
+- `rag_index_pdf`: indexes base64-encoded PDF bytes through `POST /v1/index/pdf`
+  (returns 404 when `ENABLE_LLAMAPARSE=false`).
 - `rag_query`: queries `POST /v1/query` and returns answer plus traceable sources.
 
 This keeps agent permissions narrow: agents can index and query through explicit tools, while vector

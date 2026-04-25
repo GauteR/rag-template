@@ -83,7 +83,11 @@ class ChromaVectorStore(VectorStorePort):
                         chunk_id=metadata.get("chunk_id", chunk_id),
                         embedding=tuple(float(value) for value in embedding),
                         text=document,
-                        breadcrumb=tuple(metadata.get("breadcrumb", "").split(" > ")),
+                        breadcrumb=tuple(
+                            metadata["breadcrumb"].split(" > ")
+                            if metadata.get("breadcrumb")
+                            else ()
+                        ),
                     ),
                     score=1.0 - float(distance),
                 )

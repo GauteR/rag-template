@@ -4,14 +4,13 @@ import httpx
 
 from core.application.ports.llm import LlmPort
 from core.domain.models import Section
-from core.infrastructure.llm.providers.openai_compatible import OpenAiCompatibleLlm
+from core.infrastructure.llm.json_utils import parse_json_object
 
 
 class AnthropicLlm(LlmPort):
     def __init__(self, *, api_key: str | None, model: str) -> None:
         self._api_key = api_key
         self._model = model
-        self._json_parser = OpenAiCompatibleLlm(base_url="", api_key=None, model="")
 
     def filter_noise(self, *, sections: list[Section]) -> set[str]:
         prompt = "\n".join(
@@ -24,7 +23,7 @@ class AnthropicLlm(LlmPort):
             ]
         )
         content = self._message(prompt)
-        parsed = self._json_parser._parse_json_object(content)  # noqa: SLF001
+        parsed = parse_json_object(content)
         node_ids = parsed.get("noisy_node_ids", [])
         return {node_id for node_id in node_ids if isinstance(node_id, str)}
 
@@ -41,7 +40,7 @@ class AnthropicLlm(LlmPort):
             ]
         )
         content = self._message(prompt)
-        parsed = self._json_parser._parse_json_object(content)  # noqa: SLF001
+        parsed = parse_json_object(content)
         node_ids = parsed.get("node_ids", [])
         return [node_id for node_id in node_ids if isinstance(node_id, str)][:k_final]
 

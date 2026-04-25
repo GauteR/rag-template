@@ -6,6 +6,7 @@ import httpx
 
 from core.application.ports.llm import LlmPort
 from core.domain.models import Section
+from core.infrastructure.llm.json_utils import parse_json_object
 
 
 class OpenAiCompatibleLlm(LlmPort):
@@ -27,7 +28,7 @@ class OpenAiCompatibleLlm(LlmPort):
             "instruction": "Return JSON only with noisy_node_ids for boilerplate sections.",
         }
         content = self._chat(json.dumps(prompt))
-        parsed = self._parse_json_object(content)
+        parsed = parse_json_object(content)
         node_ids = parsed.get("noisy_node_ids", [])
         return {node_id for node_id in node_ids if isinstance(node_id, str)}
 
@@ -41,7 +42,7 @@ class OpenAiCompatibleLlm(LlmPort):
             "instruction": f"Return JSON with node_ids, top {k_final}, most relevant first.",
         }
         content = self._chat(json.dumps(prompt))
-        parsed = self._parse_json_object(content)
+        parsed = parse_json_object(content)
         node_ids = parsed.get("node_ids", [])
         return [node_id for node_id in node_ids if isinstance(node_id, str)][:k_final]
 
@@ -67,14 +68,3 @@ class OpenAiCompatibleLlm(LlmPort):
             )
             response.raise_for_status()
             return response.json()["choices"][0]["message"]["content"]
-
-    def _parse_json_object(self, content: str) -> dict[str, object]:
-        start = content.find("{")
-        end = content.rfind("}")
-        if start == -1 or end == -1:
-            return {}
-        try:
-            parsed = json.loads(content[start : end + 1])
-        except json.JSONDecodeError:
-            return {}
-        return parsed if isinstance(parsed, dict) else {}

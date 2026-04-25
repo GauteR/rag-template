@@ -7,8 +7,6 @@ services:
       - .env
     environment:
       INDEX_DIR: /data/index
-      CHROMA_HOST: chroma
-      CHROMA_PORT: 8000
     ports:
       - "8000:8000"
     volumes:
@@ -17,7 +15,7 @@ services:
       - chroma
 
   chroma:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:1.5.8
     ports:
       - "8001:8000"
     volumes:

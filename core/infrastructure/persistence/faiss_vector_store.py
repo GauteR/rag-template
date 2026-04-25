@@ -61,6 +61,10 @@ class FaissVectorStore(VectorStorePort):
         self._rebuild_index()
 
     def search(self, embedding: list[float], *, limit: int) -> list[SearchHit]:
+        if len(embedding) != self._dimension:
+            raise ValueError(
+                f"Embedding dimension mismatch: expected {self._dimension}, got {len(embedding)}"
+            )
         if self._index is None:
             return self._fallback.search(embedding, limit=limit)
         import numpy as np

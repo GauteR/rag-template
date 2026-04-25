@@ -10,9 +10,9 @@ Reference: plan «Generic Proxy-Pointer RAG Template» (FastAPI, modular monolit
 ## Architecture and Dependencies
 
 - **Clean Architecture:** dependencies point inwards. Presentation → application → domain. Infrastructure implements ports from the application; adapters may use domain types where needed.
-- **Domain** (`rag_template_core/domain/`): no FastAPI, httpx, FAISS, file paths, or reading from `os.environ`. Only entities, value objects, and domain rules.
-- **Application** (`rag_template_core/application/`): use cases, `typing.Protocol`/ABC ports (`LlmPort`, `EmbedderPort`, `VectorStorePort`, `SectionSourcePort`, `PdfExtractorPort`). Import only from domain (+ stdlib).
-- **Infrastructure** (`rag_template_core/infrastructure/`): concrete adapters; config injected via constructor/factory — **no** global env reads in the domain.
+- **Domain** (`core/domain/`): no FastAPI, httpx, FAISS, file paths, or reading from `os.environ`. Only entities, value objects, and domain rules.
+- **Application** (`core/application/`): use cases, `typing.Protocol`/ABC ports (`LlmPort`, `EmbedderPort`, `VectorStorePort`, `SectionSourcePort`, `PdfExtractorPort`). Import only from domain (+ stdlib).
+- **Infrastructure** (`core/infrastructure/`): concrete adapters; config injected via constructor/factory — **no** global env reads in the domain.
 - **Presentation** (`app/`): thin FastAPI routes; one application service per endpoint; Pydantic for HTTP schemas.
 - **Composition root** (`app/container.py` or equivalent): the only place that wires ports to adapters based on `Settings` (pydantic-settings). Routes do not instantiate FAISS/LLM directly.
 

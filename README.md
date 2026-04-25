@@ -62,7 +62,7 @@ docker build -t rag-template .
 docker run --env-file .env -p 8000:8000 rag-template
 ```
 
-Run the API with ChromaDB through Docker Compose:
+Run the API and an optional ChromaDB sidecar through Docker Compose (the API uses FAISS by default; ChromaDB is available as an optional backend):
 
 ```bash
 docker compose up --build
@@ -71,7 +71,7 @@ docker compose up --build
 Service ports:
 
 - API: `http://127.0.0.1:8000`
-- ChromaDB: `http://127.0.0.1:8001`
+- ChromaDB (sidecar, not used by default): `http://127.0.0.1:8001`
 
 ## Index Markdown
 
@@ -212,9 +212,10 @@ vector_store = ChromaVectorStore(
 )
 ```
 
-To make ChromaDB the active backend, add settings such as `VECTOR_STORE_PROVIDER=chroma`,
-`CHROMA_HOST`, `CHROMA_PORT`, and `CHROMA_COLLECTION`, then select `ChromaVectorStore` in
-`app/container.py`.
+To use ChromaDB as the active backend, wire `ChromaVectorStore` into your application/container
+setup directly. The example above shows the constructor shape, but this repository does not expose
+dedicated `VECTOR_STORE_PROVIDER`, `CHROMA_HOST`, `CHROMA_PORT`, or `CHROMA_COLLECTION`
+settings for switching backends via environment variables.
 
 ### AI Agents via MCP
 
@@ -261,7 +262,7 @@ Tools exposed:
 This keeps agent permissions narrow: agents can index and query through explicit tools, while vector
 database credentials and provider API keys stay server-side.
 
-1## Benchmarks
+## Benchmarks
 
 The benchmark module compares model profiles against the same query pipeline and can write JSON and
 CSV artifacts.

@@ -171,10 +171,10 @@ def create_mcp_server(
 
     @server.tool(
         name="rag_index_pdf",
-        annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": False},
+        annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True},
     )
     async def rag_index_pdf(_params: IndexPdfInput) -> dict[str, Any]:
-        """Index PDF content in the Proxy-Pointer RAG service."""
+        """Call PDF indexing; endpoint requires ENABLE_LLAMAPARSE=true and a PdfExtractorPort."""
         return await client.index_pdf()
 
     @server.tool(

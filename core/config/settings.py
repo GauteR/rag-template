@@ -17,7 +17,7 @@ class Settings(BaseSettings):
 
     enable_llm_noise_filter: bool = False
     enable_llm_reranker: bool = False
-    enable_llamaparse: bool = False
+    enable_llamaparse: bool = True
     enable_benchmark_judge: bool = False
 
     index_dir: Path = Field(default=Path(".index"))

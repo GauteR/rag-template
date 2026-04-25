@@ -121,7 +121,7 @@ EMBEDDING_DIMENSION=8
 
 ENABLE_LLM_NOISE_FILTER=false
 ENABLE_LLM_RERANKER=false
-ENABLE_LLAMAPARSE=false
+ENABLE_LLAMAPARSE=true
 ENABLE_BENCHMARK_JUDGE=false
 
 INDEX_DIR=.index
@@ -177,10 +177,11 @@ EMBEDDING_DIMENSION=8
 
 ## PDF Indexing
 
-`POST /v1/index/pdf` is behind `ENABLE_LLAMAPARSE`.
+`POST /v1/index/pdf` is enabled by default through `ENABLE_LLAMAPARSE=true`.
 
-The route is intentionally disabled by default. Enabling it requires a configured `PdfExtractorPort`
-adapter and `LLAMA_CLOUD_API_KEY`.
+The current route returns `501 Not Implemented` unless a `PdfExtractorPort` adapter is wired in.
+If that adapter is LlamaParse-backed, it is expected to require `LLAMA_CLOUD_API_KEY`; the API route
+itself does not currently check that variable.
 
 ## Infrastructure Integrations
 
@@ -257,6 +258,8 @@ Tools exposed:
 
 - `rag_health`: checks `GET /v1/health`.
 - `rag_index_markdown`: indexes Markdown through `POST /v1/index/markdown`.
+- `rag_index_pdf`: calls `POST /v1/index/pdf` (returns 404 when `ENABLE_LLAMAPARSE=false`,
+  and currently returns 501 until a `PdfExtractorPort` adapter is wired).
 - `rag_query`: queries `POST /v1/query` and returns answer plus traceable sources.
 
 This keeps agent permissions narrow: agents can index and query through explicit tools, while vector

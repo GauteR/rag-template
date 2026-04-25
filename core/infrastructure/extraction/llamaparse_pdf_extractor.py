@@ -31,13 +31,19 @@ class LlamaParsePdfExtractor(PdfExtractorPort):
             ) from exc
 
         suffix = Path(filename).suffix or ".pdf"
-        with tempfile.NamedTemporaryFile(suffix=suffix) as tmp:
-            tmp.write(content)
-            tmp.flush()
+        temp_path: str | None = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                tmp.write(content)
+                tmp.flush()
+                temp_path = tmp.name
             documents = LlamaParse(
                 api_key=self._api_key,
                 result_type="markdown",
-            ).load_data(tmp.name)
+            ).load_data(temp_path)
+        finally:
+            if temp_path is not None:
+                Path(temp_path).unlink(missing_ok=True)
 
         markdown = "\n\n".join(
             doc.text.strip()

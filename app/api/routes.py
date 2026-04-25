@@ -102,7 +102,7 @@ def query(
     )
 
 
-@router.post("/index/pdf")
+@router.post("/index/pdf", response_model=IndexMarkdownResponse)
 async def index_pdf(
     file: Annotated[UploadFile, File(...)],
     doc_id: Annotated[str | None, Form()] = None,
@@ -122,19 +122,30 @@ async def index_pdf(
             detail="doc_id is required when the uploaded file has no filename.",
         )
 
-    content = await file.read()
-    if not content:
+    max_bytes = container.settings.max_upload_mb * 1024 * 1024
+    chunk_size = 1024 * 1024
+    total_bytes = 0
+    content_buffer = bytearray()
+
+    while True:
+        chunk = await file.read(chunk_size)
+        if not chunk:
+            break
+        total_bytes += len(chunk)
+        if total_bytes > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"PDF payload exceeds maximum size of {container.settings.max_upload_mb} MB",
+            )
+        content_buffer.extend(chunk)
+
+    if not content_buffer:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="PDF payload is empty.",
         )
 
-    max_bytes = container.settings.max_upload_mb * 1024 * 1024
-    if len(content) > max_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"PDF payload exceeds maximum size of {container.settings.max_upload_mb} MB",
-        )
+    content = bytes(content_buffer)
 
     try:
         markdown = container.pdf_extractor.extract_markdown(filename=filename, content=content)

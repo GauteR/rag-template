@@ -1,0 +1,69 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# env files and secrets
+.env
+.env.*
+!.env.example
+
+# Pytest and coverage
+.cache/
+.pytest_cache/
+.coverage
+*.cover
+coverage.xml
+htmlcov/
+.ruff_cache/
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# VSCode and Editor files
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Jupyter
+.ipynb_checkpoints
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Dependency/env dirs
+venv/
+.venv/
+.env/
+*.venv/
+poetry.lock
+
+# Test output and local server files
+benchmarks/out/
+.index/
+# Vector DB index directory _configurable_, but add common path:
+rag_template_core/infrastructure/vectorstore/faiss_index/
+
+# Local review artifacts
+code-review-report.md
+
+# Local data
+data/
+local_data/
+
+# Misc
+*.bak
+*.swp
+*.tmp

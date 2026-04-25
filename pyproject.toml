@@ -22,7 +22,9 @@ dev = [
     "ruff>=0.5",
 ]
 faiss = ["faiss-cpu>=1.8"]
+chroma = ["chromadb>=0.5"]
 llamaparse = ["llama-cloud-services>=0.6"]
+mcp = ["mcp>=1.0"]
 
 [tool.setuptools.packages.find]
 include = ["app*", "core*"]

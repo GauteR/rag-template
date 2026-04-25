@@ -53,6 +53,26 @@ Check health:
 curl http://127.0.0.1:8000/v1/health
 ```
 
+## Run with Docker
+
+Build and run the API container:
+
+```bash
+docker build -t rag-template .
+docker run --env-file .env -p 8000:8000 rag-template
+```
+
+Run the API with ChromaDB through Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+Service ports:
+
+- API: `http://127.0.0.1:8000`
+- ChromaDB: `http://127.0.0.1:8001`
+
 ## Index Markdown
 
 ```bash
@@ -162,7 +182,86 @@ EMBEDDING_DIMENSION=8
 The route is intentionally disabled by default. Enabling it requires a configured `PdfExtractorPort`
 adapter and `LLAMA_CLOUD_API_KEY`.
 
-## Benchmarks
+## Infrastructure Integrations
+
+The template is built around application ports, so infrastructure can be replaced without changing
+the domain or use cases.
+
+### ChromaDB
+
+The repository includes `core.infrastructure.persistence.chroma_vector_store.ChromaVectorStore` as
+an example infrastructure adapter. It implements `VectorStorePort`, stores Proxy-Pointer metadata in
+Chroma, deletes vectors by `doc_id` during reindexing, and maps Chroma query results back to
+`SearchHit`.
+
+Install the optional dependency:
+
+```bash
+uv sync --python 3.11 --extra dev --extra chroma
+```
+
+Adapter shape:
+
+```python
+from core.infrastructure.persistence.chroma_vector_store import ChromaVectorStore
+
+vector_store = ChromaVectorStore(
+    host="localhost",
+    port=8000,
+    collection_name="rag_template",
+)
+```
+
+To make ChromaDB the active backend, add settings such as `VECTOR_STORE_PROVIDER=chroma`,
+`CHROMA_HOST`, `CHROMA_PORT`, and `CHROMA_COLLECTION`, then select `ChromaVectorStore` in
+`app/container.py`.
+
+### AI Agents via MCP
+
+The repository includes `core.mcp_server`, a FastMCP implementation that exposes the RAG API as
+agent tools.
+
+Install the optional dependency:
+
+```bash
+uv sync --python 3.11 --extra dev --extra mcp
+```
+
+Run over stdio:
+
+```bash
+uv run --python 3.11 --extra mcp python -m core.mcp_server \
+  --base-url http://127.0.0.1:8000 \
+  --transport stdio
+```
+
+Run over HTTP:
+
+```bash
+uv run --python 3.11 --extra mcp python -m core.mcp_server \
+  --base-url http://127.0.0.1:8000 \
+  --transport streamable-http
+```
+
+If the FastAPI service uses `API_KEY`, pass it to the MCP server:
+
+```bash
+uv run --python 3.11 --extra mcp python -m core.mcp_server \
+  --base-url http://127.0.0.1:8000 \
+  --api-key your-key \
+  --transport stdio
+```
+
+Tools exposed:
+
+- `rag_health`: checks `GET /v1/health`.
+- `rag_index_markdown`: indexes Markdown through `POST /v1/index/markdown`.
+- `rag_query`: queries `POST /v1/query` and returns answer plus traceable sources.
+
+This keeps agent permissions narrow: agents can index and query through explicit tools, while vector
+database credentials and provider API keys stay server-side.
+
+1## Benchmarks
 
 The benchmark module compares model profiles against the same query pipeline and can write JSON and
 CSV artifacts.

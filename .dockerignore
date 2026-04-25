@@ -1,0 +1,17 @@
+.git
+.venv
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.index
+benchmarks/out
+build
+dist
+*.egg-info
+__pycache__
+*.pyc
+.env
+.env.*
+!.env.example
+code-review-report.md
+.cursor

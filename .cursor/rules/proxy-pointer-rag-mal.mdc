@@ -1,0 +1,63 @@
+---
+description: Architecture and conventions for the Proxy-Pointer RAG template (Clean Architecture, ports, API).
+alwaysApply: true
+---
+
+# Proxy-Pointer RAG Template — Project Rules
+
+Reference: plan «Generic Proxy-Pointer RAG Template» (FastAPI, modular monolith).
+
+## Architecture and Dependencies
+
+- **Clean Architecture:** dependencies point inwards. Presentation → application → domain. Infrastructure implements ports from the application; adapters may use domain types where needed.
+- **Domain** (`core/domain/`): no FastAPI, httpx, FAISS, file paths, or reading from `os.environ`. Only entities, value objects, and domain rules.
+- **Application** (`core/application/`): use cases, `typing.Protocol`/ABC ports (`LlmPort`, `EmbedderPort`, `VectorStorePort`, `SectionSourcePort`, `PdfExtractorPort`). Import only from domain (+ stdlib).
+- **Infrastructure** (`core/infrastructure/`): concrete adapters; config injected via constructor/factory — **no** global env reads in the domain.
+- **Presentation** (`app/`): thin FastAPI routes; one application service per endpoint; Pydantic for HTTP schemas.
+- **Composition root** (`app/container.py` or equivalent): the only place that wires ports to adapters based on `Settings` (pydantic-settings). Routes do not instantiate FAISS/LLM directly.
+
+## Modules and Naming
+
+- A single deployable **modular monolith**; delimited modules: `indexing`, `query`, `benchmarking` with few cross-imports.
+- **snake_case** for service/app names and package paths in the repo.
+
+## LLM and Embeddings (Extensible)
+
+- A single **LlmPort** contract; provider chosen via **registry** mapping string `provider-id` to adapter factory. Roles: `LLM_ROUTING_PROVIDER`, `LLM_SYNTHESIS_PROVIDER` (or shared `LLM_PROVIDER` as default).
+- **EmbedderPort** with the same pattern: `EMBEDDING_PROVIDER` + `EMBEDDING_DIMENSION` matching FAISS.
+- New provider: module under `infrastructure/llm/providers/<id>/` (and similarly for embeddings), registration in `registry.py`, env documented in `.env.example`, optional `pyproject` extra, tests with mocked HTTP/SDK.
+- Structured JSON for noise filter/re-rank: the adapter normalizes to unified semantics (native JSON, `response_format`, tools, or robust text parsing) — use cases must not be aware of which API is used.
+
+## Proxy-Pointer Pipeline (Core)
+
+1. Markdown → **skeleton tree** (`#`…`######`) with `node_id`, level, order.
+2. **Structure-guided chunking** only within section boundaries (not across heading nodes).
+3. **Breadcrumb injection** in embedding text: `path > to > section` + content.
+4. **Noise filter:** with `ENABLE_LLM_NOISE_FILTER` — LLM; without — heuristic/stopword list.
+5. **Query:** Stage1 FAISS (broad recall) → dedupe `(doc_id, node_id)` → Stage2 LLM re-rank on breadcrumbs (or embedding-only ranking when `ENABLE_LLM_RERANKER` is off) → **pointer:** fetch **full section text** for each selected node for synthesis — not just the chunk fragment.
+6. Document without headings: one root node or flat chunking (graceful degradation).
+
+## API (Goals)
+
+- `POST /v1/index/markdown`, `POST /v1/query`, `GET /v1/health`.
+- Optional: `POST /v1/index/pdf` behind the LlamaParse flag.
+- Reply with traceability: breadcrumb path, `node_id`, citation/offset where possible.
+
+## Configuration and Feature Flags
+
+- New functionality must be toggleable: behind env flags (e.g. `ENABLE_LLM_RERANKER`, `ENABLE_LLAMAPARSE`, `ENABLE_BENCHMARK_JUDGE`).
+- Validation at startup/health: selected provider exists in registry; required keys/base_url for the active adapter.
+
+## Benchmark
+
+- `ModelProfile` + same index/`k_*` for comparison; CI with mocked LLM/embedding; live runs flagged (`pytest -m live_models` or CLI).
+- Artifacts under `benchmarks/out/` (JSON/CSV); no proprietary datasets in repo — BYO questions/gold metadata.
+
+## Quality and Security
+
+- Validate file type and size; no arbitrary file writing outside of `INDEX_DIR` / configured index path.
+- Structured logging without PII leakage; optional `X-API-Key` for the service where appropriate.
+
+## Not in the First Iteration
+
+- Full FinanceBench reproduction; horizontal scaling of the index beyond a single process/FAISS file — not a goal for the template.

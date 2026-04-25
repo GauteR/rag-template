@@ -1,28 +1,28 @@
 ---
 name: Proxy-Pointer RAG-mal
-overview: "Bygge et tomt `rag-template`-repo om til en generisk RAG-tjeneste (én utrullbar monolitt) med Clean Architecture. Proxy-Pointer fra artikkelen. LLM via utvidbar leverandør-registry (porter + adaptere per leverandør, valgfri OpenAI-kompatibel/LiteLLM-bro); benchmark for modellsammenligning."
+overview: Bygge et tomt `rag-template`-repo om til en generisk RAG-tjeneste (én utrullbar monolitt) med Clean Architecture. Proxy-Pointer fra artikkelen. LLM via utvidbar leverandør-registry (porter + adaptere per leverandør, valgfri OpenAI-kompatibel/LiteLLM-bro); benchmark for modellsammenligning.
 todos:
   - id: scaffold
-    content: "Monorepo-lag + LlmPort/EmbedderPort + llm_registry som mapper provider-id til adapter-fabrikk; pyproject med valgfrie extras per leverandør, .env.example, health, DI"
-    status: pending
+    content: Monorepo-lag + LlmPort/EmbedderPort + llm_registry som mapper provider-id til adapter-fabrikk; pyproject med valgfrie extras per leverandør, .env.example, health, DI
+    status: completed
   - id: skeleton-chunk
     content: Domene-modeller for tre/chunk + applikasjonstjenester for parsing og chunking (uten IO); enhetstester mot domene
-    status: pending
+    status: completed
   - id: index-faiss
     content: "Bygg indeks: støyfilter (flagg), embedding-adapter (Ollama m.m.), FAISS + metadata (node_id → seksjonstekst)"
-    status: pending
+    status: completed
   - id: retrieve-synth
     content: To-trinns retrieval + pointer + syntese via LlmPort; konfigurerbare k_*; wiring fra registry etter LLM_*_PROVIDER
-    status: pending
+    status: completed
   - id: fastapi-routes
     content: POST /v1/index/markdown, POST /v1/query, valgfri PDF-rute bak LlamaParse-flagg
-    status: pending
+    status: completed
   - id: tests-qa
-    content: Tester: domene + use cases med fake-porter; API smoke via TestClient; valgfritt import-linter; QA-sjekkliste i PR-tekst
-    status: pending
+    content: "Tester: domene + use cases med fake-porter; API smoke via TestClient; valgfritt import-linter; QA-sjekkliste i PR-tekst"
+    status: completed
   - id: model-benchmark
     content: Modellmatrise + pytest/CLI som kjører samme spørsmål mot flere modellprofiler; målinger (latens, retrieval-treff, valgfri LLM-judge); artefakter JSON/CSV
-    status: pending
+    status: completed
 isProject: false
 ---
 

@@ -1,0 +1,26 @@
+services:
+  rag-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      INDEX_DIR: /data/index
+    ports:
+      - "8000:8000"
+    volumes:
+      - rag_index:/data/index
+    depends_on:
+      - chroma
+
+  chroma:
+    image: chromadb/chroma:1.5.8
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/chroma/chroma
+
+volumes:
+  rag_index:
+  chroma_data:

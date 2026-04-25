@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 
-def parse_json_object(content: str) -> dict[str, object]:
+def parse_json_object(content: str) -> dict[str, Any]:
     """Extract the first JSON object from *content* and return it as a dict.
 
     Returns an empty dict when no valid JSON object is found.

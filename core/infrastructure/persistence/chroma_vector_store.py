@@ -84,7 +84,7 @@ class ChromaVectorStore(VectorStorePort):
                         embedding=tuple(float(value) for value in embedding),
                         text=document,
                         breadcrumb=tuple(
-                            metadata["breadcrumb"].split(" > ")
+                            metadata.get("breadcrumb", "").split(" > ")
                             if metadata.get("breadcrumb")
                             else ()
                         ),

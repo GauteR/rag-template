@@ -180,6 +180,7 @@ EMBEDDING_DIMENSION=8
 `POST /v1/index/pdf` is enabled by default through `ENABLE_LLAMAPARSE=true`.
 
 The route currently requires a configured `PdfExtractorPort` adapter and `LLAMA_CLOUD_API_KEY`.
+Without that adapter wiring, the endpoint returns `501 Not Implemented`.
 
 ## Infrastructure Integrations
 

@@ -257,6 +257,8 @@ Tools exposed:
 
 - `rag_health`: checks `GET /v1/health`.
 - `rag_index_markdown`: indexes Markdown through `POST /v1/index/markdown`.
+- `rag_index_pdf`: calls `POST /v1/index/pdf` (returns 404 unless `ENABLE_LLAMAPARSE=true`,
+  and currently returns 501 until a `PdfExtractorPort` adapter is wired).
 - `rag_query`: queries `POST /v1/query` and returns answer plus traceable sources.
 
 This keeps agent permissions narrow: agents can index and query through explicit tools, while vector

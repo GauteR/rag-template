@@ -72,6 +72,10 @@ class IndexMarkdownInput(BaseModel):
     markdown: str = Field(..., min_length=1, description="Markdown content to index.")
 
 
+class IndexPdfInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
 class QueryInput(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -95,6 +99,9 @@ class RagApiClient:
             "/v1/index/markdown",
             json={"doc_id": doc_id, "markdown": markdown},
         )
+
+    async def index_pdf(self) -> dict[str, Any]:
+        return await self._request("POST", "/v1/index/pdf")
 
     async def query(
         self,
@@ -159,6 +166,15 @@ def create_mcp_server(
     async def rag_index_markdown(params: IndexMarkdownInput) -> dict[str, Any]:
         """Index Markdown content in the Proxy-Pointer RAG service."""
         return await client.index_markdown(doc_id=params.doc_id, markdown=params.markdown)
+
+    @server.tool(
+        name="rag_index_pdf",
+        annotations={"readOnlyHint": False, "destructiveHint": False, "idempotentHint": True},
+    )
+    async def rag_index_pdf(params: IndexPdfInput) -> dict[str, Any]:
+        """Index PDF content in the Proxy-Pointer RAG service."""
+        del params
+        return await client.index_pdf()
 
     @server.tool(
         name="rag_query",

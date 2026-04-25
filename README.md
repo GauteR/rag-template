@@ -179,8 +179,9 @@ EMBEDDING_DIMENSION=8
 
 `POST /v1/index/pdf` is enabled by default through `ENABLE_LLAMAPARSE=true`.
 
-The route currently requires a configured `PdfExtractorPort` adapter and `LLAMA_CLOUD_API_KEY`.
-Without that adapter wiring, the endpoint returns `501 Not Implemented`.
+The current route returns `501 Not Implemented` unless a `PdfExtractorPort` adapter is wired in.
+If that adapter is LlamaParse-backed, it is expected to require `LLAMA_CLOUD_API_KEY`; the API route
+itself does not currently check that variable.
 
 ## Infrastructure Integrations
 
@@ -257,7 +258,7 @@ Tools exposed:
 
 - `rag_health`: checks `GET /v1/health`.
 - `rag_index_markdown`: indexes Markdown through `POST /v1/index/markdown`.
-- `rag_index_pdf`: calls `POST /v1/index/pdf` (returns 404 unless `ENABLE_LLAMAPARSE=true`,
+- `rag_index_pdf`: calls `POST /v1/index/pdf` (returns 404 when `ENABLE_LLAMAPARSE=false`,
   and currently returns 501 until a `PdfExtractorPort` adapter is wired).
 - `rag_query`: queries `POST /v1/query` and returns answer plus traceable sources.
 

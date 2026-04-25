@@ -57,10 +57,10 @@ def test_index_pdf_is_enabled_by_default(tmp_path) -> None:
     assert response.status_code == 501
 
 
-def test_index_pdf_requires_pdf_extractor_when_enabled(tmp_path) -> None:
-    container = AppContainer(settings=Settings(index_dir=tmp_path, enable_llamaparse=True))
+def test_index_pdf_returns_404_when_llamaparse_disabled(tmp_path) -> None:
+    container = AppContainer(settings=Settings(index_dir=tmp_path, enable_llamaparse=False))
     client = TestClient(create_app(container=container))
 
     response = client.post("/v1/index/pdf")
 
-    assert response.status_code == 501
+    assert response.status_code == 404

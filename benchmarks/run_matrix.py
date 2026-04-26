@@ -5,10 +5,6 @@ to benchmarks/out/.
 Usage (no live credentials required for the default echo/hash providers):
 
     python benchmarks/run_matrix.py
-
-To use live model profiles add them to model_matrix.yaml and run:
-
-    python benchmarks/run_matrix.py --live --config benchmarks/model_matrix.yaml
 """
 
 from __future__ import annotations
@@ -17,20 +13,13 @@ import argparse
 import sys
 from pathlib import Path
 
-try:
-    import yaml
-except ImportError:
-    print("pyyaml is required: pip install pyyaml", file=sys.stderr)
-    sys.exit(1)
-
-# Allow running from the repo root without installing the package.
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from core.application.benchmarking.models import BenchmarkQuestion, ModelProfile
 from core.application.benchmarking.runner import BenchmarkRunner
 
 
 def _load_profiles(matrix_path: Path) -> tuple[dict, list[ModelProfile]]:
+    import yaml
+
     data = yaml.safe_load(matrix_path.read_text(encoding="utf-8"))
     profiles = [
         ModelProfile(
@@ -46,6 +35,8 @@ def _load_profiles(matrix_path: Path) -> tuple[dict, list[ModelProfile]]:
 
 
 def _load_questions(questions_path: Path) -> list[BenchmarkQuestion]:
+    import yaml
+
     data = yaml.safe_load(questions_path.read_text(encoding="utf-8"))
     return [
         BenchmarkQuestion(
@@ -80,6 +71,11 @@ def _make_mock_use_case():
 
 
 def main(argv: list[str] | None = None) -> None:
+    try:
+        import yaml  # noqa: F401  – validate availability early
+    except ImportError:
+        raise ImportError("pyyaml is required: pip install pyyaml") from None
+
     parser = argparse.ArgumentParser(description="Run the benchmark model matrix.")
     parser.add_argument(
         "--config",
@@ -95,12 +91,6 @@ def main(argv: list[str] | None = None) -> None:
         "--output-dir",
         default="benchmarks/out",
         help="Directory to write JSON/CSV artifacts (default: benchmarks/out)",
-    )
-    parser.add_argument(
-        "--live",
-        action="store_true",
-        default=False,
-        help="Use live providers instead of the built-in mock (requires credentials).",
     )
     args = parser.parse_args(argv)
 
@@ -142,4 +132,6 @@ def main(argv: list[str] | None = None) -> None:
 
 
 if __name__ == "__main__":
+    # Allow running directly from the repo root without installing the package.
+    sys.path.insert(0, str(Path(__file__).parent.parent))
     main()

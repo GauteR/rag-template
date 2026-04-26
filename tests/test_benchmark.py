@@ -202,3 +202,9 @@ def test_benchmark_run_matrix_script(tmp_path: Path) -> None:
     data = json.loads(artifacts[0].read_text(encoding="utf-8"))
     profile_names = {row["profile_name"] for row in data["rows"]}
     assert len(profile_names) >= 2, "JSON artifact must contain at least two profiles"
+
+    csv_artifacts = list(tmp_path.glob("benchmark-*.csv"))
+    assert csv_artifacts, "run_matrix.py must write a CSV artifact"
+    csv_text = csv_artifacts[0].read_text(encoding="utf-8")
+    for name in profile_names:
+        assert name in csv_text, f"CSV artifact must contain rows for profile '{name}'"

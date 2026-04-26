@@ -52,6 +52,8 @@ def test_faiss_vector_store_persists_records_across_restarts(tmp_path) -> None:
     assert restarted_store.count() == 1
     assert hits[0].record.node_id == "manual:n1"
     assert (tmp_path / "vectors.records.json").exists()
+    if restarted_store._faiss is not None:
+        assert index_path.exists()
 
 
 def test_faiss_vector_store_raises_clear_error_for_corrupt_records_file(tmp_path) -> None:

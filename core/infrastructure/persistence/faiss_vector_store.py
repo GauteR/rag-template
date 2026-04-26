@@ -21,7 +21,9 @@ class FaissVectorStore(VectorStorePort):
         self._records: list[VectorRecord] = []
         self._fallback = InMemoryVectorStore()
         self._index_path = index_path
-        self._records_path = index_path.with_suffix(".records.json") if index_path else None
+        self._records_path = None
+        if index_path is not None:
+            self._records_path = index_path.with_name(f"{index_path.stem}.records.json")
         try:
             import faiss  # type: ignore[import-not-found]
         except ImportError:
@@ -61,11 +63,19 @@ class FaissVectorStore(VectorStorePort):
         self._save()
 
     def delete_document(self, doc_id: str) -> None:
-        self._records = [record for record in self._records if record.doc_id != doc_id]
         if self._index is None:
+            self._records = [record for record in self._records if record.doc_id != doc_id]
             self._fallback.delete_document(doc_id)
         else:
-            self._rebuild_index()
+            original_records = self._records
+            original_index = self._index
+            self._records = [record for record in self._records if record.doc_id != doc_id]
+            try:
+                self._rebuild_index()
+            except Exception:
+                self._records = original_records
+                self._index = original_index
+                raise
         self._save()
 
     def search(self, embedding: list[float], *, limit: int) -> list[SearchHit]:
@@ -146,7 +156,7 @@ class FaissVectorStore(VectorStorePort):
         if index_exists:
             try:
                 self._index = self._faiss.read_index(str(self._index_path))
-            except Exception as exc:  # pragma: no cover - depends on native faiss errors
+            except (RuntimeError, OSError, ValueError) as exc:
                 raise ValueError(f"Failed to load FAISS index from {self._index_path}") from exc
         else:
             self._rebuild_index()
@@ -177,6 +187,11 @@ class FaissVectorStore(VectorStorePort):
             }
             for record in self._records
         ]
+        if not payload:
+            self._records_path.unlink(missing_ok=True)
+            if self._index_path is not None:
+                self._index_path.unlink(missing_ok=True)
+            return
         self._records_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
         if self._index is None or self._index_path is None:
             return

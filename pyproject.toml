@@ -22,6 +22,7 @@ dependencies = [
 dev = [
     "pytest>=8.2",
     "ruff>=0.5",
+    "import-linter>=2.0",
 ]
 faiss = ["faiss-cpu>=1.8"]
 chroma = ["chromadb>=0.5"]
@@ -43,3 +44,31 @@ target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.importlinter]
+root_packages = ["core", "app"]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Domain layer is independent of outer layers and framework libs"
+type = "forbidden"
+source_modules = ["core.domain"]
+forbidden_modules = [
+    "core.application",
+    "core.infrastructure",
+    "core.config",
+    "app",
+    "fastapi",
+    "faiss",
+    "httpx",
+    "pydantic_settings",
+]
+
+[[tool.importlinter.contracts]]
+name = "Application layer does not import infrastructure or presentation"
+type = "forbidden"
+source_modules = ["core.application"]
+forbidden_modules = [
+    "core.infrastructure",
+    "app",
+]

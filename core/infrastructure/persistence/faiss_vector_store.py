@@ -160,6 +160,14 @@ class FaissVectorStore(VectorStorePort):
                 raise ValueError(f"Failed to load FAISS index from {self._index_path}") from exc
         else:
             self._rebuild_index()
+            if (
+                self._faiss is not None
+                and self._index is not None
+                and self._index_path is not None
+                and self._index.ntotal > 0
+            ):
+                self._index_path.parent.mkdir(parents=True, exist_ok=True)
+                self._faiss.write_index(self._index, str(self._index_path))
         if self._index.d != self._dimension:
             raise ValueError(
                 "FAISS index dimension mismatch: "
@@ -193,7 +201,11 @@ class FaissVectorStore(VectorStorePort):
                 self._index_path.unlink(missing_ok=True)
             return
         self._records_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        if self._index is None or self._index_path is None:
+        if self._index is None:
+            if self._index_path is not None:
+                self._index_path.unlink(missing_ok=True)
+            return
+        if self._index_path is None:
             return
         if self._index.ntotal == 0:
             self._index_path.unlink(missing_ok=True)

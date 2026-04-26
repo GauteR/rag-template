@@ -52,8 +52,50 @@ def test_faiss_vector_store_persists_records_across_restarts(tmp_path) -> None:
     assert restarted_store.count() == 1
     assert hits[0].record.node_id == "manual:n1"
     assert (tmp_path / "vectors.records.json").exists()
-    if restarted_store._faiss is not None:
-        assert index_path.exists()
+
+
+def test_faiss_writes_index_file_after_add(tmp_path) -> None:
+    pytest.importorskip("faiss")
+    index_path = tmp_path / "vectors.faiss"
+    store = FaissVectorStore(dimension=2, index_path=index_path)
+    store.add(
+        [
+            VectorRecord(
+                doc_id="manual",
+                node_id="manual:n1",
+                chunk_id="manual:n1:c1",
+                embedding=(1.0, 0.0),
+                text="install",
+                breadcrumb=("Manual", "Install"),
+            )
+        ]
+    )
+
+    assert index_path.exists()
+
+
+def test_faiss_backend_rebuilds_and_persists_missing_index_file(tmp_path) -> None:
+    pytest.importorskip("faiss")
+    index_path = tmp_path / "vectors.faiss"
+    store = FaissVectorStore(dimension=2, index_path=index_path)
+    store.add(
+        [
+            VectorRecord(
+                doc_id="manual",
+                node_id="manual:n1",
+                chunk_id="manual:n1:c1",
+                embedding=(1.0, 0.0),
+                text="install",
+                breadcrumb=("Manual", "Install"),
+            )
+        ]
+    )
+    index_path.unlink()
+
+    restarted_store = FaissVectorStore(dimension=2, index_path=index_path)
+
+    assert restarted_store.count() == 1
+    assert index_path.exists()
 
 
 def test_faiss_vector_store_raises_clear_error_for_corrupt_records_file(tmp_path) -> None:

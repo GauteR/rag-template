@@ -17,6 +17,12 @@ class DocumentNode:
     end_char: int | None = None
 
     @property
+    def citation(self) -> str:
+        if self.level <= 0:
+            return self.title
+        return f"{'#' * self.level} {self.title}"
+
+    @property
     def section_text(self) -> str:
         if self.level <= 0:
             return self.content

@@ -4,13 +4,7 @@ import json
 from pathlib import Path
 
 from core.application.ports.section_source import SectionSourcePort
-from core.domain.models import Document, DocumentNode, Section
-
-
-def _build_citation(node: DocumentNode) -> str:
-    if node.level <= 0:
-        return node.title
-    return f"{'#' * node.level} {node.title}"
+from core.domain.models import Document, Section
 
 
 class JsonSectionStore(SectionSourcePort):
@@ -42,7 +36,7 @@ class JsonSectionStore(SectionSourcePort):
                 node_id=node.node_id,
                 breadcrumb=node.breadcrumb,
                 text=section_text,
-                citation=_build_citation(node),
+                citation=node.citation,
                 start_offset=node.start_char,
                 end_offset=end_char,
             )

@@ -14,6 +14,7 @@ from core.infrastructure.persistence.in_memory_section_store import (
 from core.infrastructure.persistence.in_memory_vector_store import (
     InMemoryVectorStore,
 )
+from core.infrastructure.persistence.json_section_store import JsonSectionStore
 
 
 class KeywordEmbedder(EmbedderPort):
@@ -248,13 +249,17 @@ def test_section_store_offsets_cover_child_sections() -> None:
     assert parent_section.end_offset >= child_section.end_offset
 
 
-def test_section_without_offset_metadata_serializes_successfully() -> None:
-    section = Section(
-        doc_id="doc",
-        node_id="doc:n1",
-        breadcrumb=("Title",),
-        text="Some text",
-    )
-    assert section.citation is None
-    assert section.start_offset is None
-    assert section.end_offset is None
+def test_section_without_offset_metadata_serializes_successfully(tmp_path) -> None:
+    store_path = tmp_path / "sections.json"
+    store = JsonSectionStore(path=store_path)
+    document = MarkdownSkeletonParser().parse(doc_id="doc", markdown="plain text without headings")
+    store.store_document(document)
+
+    reloaded = JsonSectionStore(path=store_path)
+    section = reloaded.get_section("doc", "doc:root")
+
+    assert section.doc_id == "doc"
+    assert section.text == "plain text without headings"
+    assert section.citation is not None
+    assert section.start_offset == 0
+    assert section.end_offset == len("plain text without headings")

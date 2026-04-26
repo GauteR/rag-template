@@ -145,6 +145,10 @@ def test_query_uses_broad_recall_dedupes_nodes_and_fetches_full_sections() -> No
     assert response.sources[0].node_id == "manual:n2"
     assert response.sources[0].breadcrumb == ("Intro", "Install")
     assert "Install with uv" in response.answer
+    assert response.sources[0].citation == "## Install"
+    assert response.sources[0].start_offset is not None
+    assert response.sources[0].end_offset is not None
+    assert response.sources[0].start_offset < response.sources[0].end_offset
 
 
 def test_query_sources_keep_vector_scores() -> None:
@@ -211,3 +215,46 @@ def test_query_reranker_falls_back_to_embedding_order_when_ids_are_invalid() -> 
     )
 
     assert response.sources[0].node_id == "manual:n2"
+
+
+def test_section_store_computes_citation_and_offsets_for_markdown_sections() -> None:
+    section_store = InMemorySectionStore()
+    markdown = "# Intro\nWelcome\n\n## Install\nInstall with uv"
+    document = MarkdownSkeletonParser().parse(doc_id="manual", markdown=markdown)
+
+    section_store.store_document(document)
+
+    install_section = section_store.get_section("manual", "manual:n2")
+    assert install_section.citation == "## Install"
+    assert install_section.start_offset is not None
+    assert install_section.end_offset is not None
+    assert install_section.start_offset < install_section.end_offset
+    assert markdown[install_section.start_offset : install_section.end_offset].startswith(
+        "## Install"
+    )
+
+
+def test_section_store_offsets_cover_child_sections() -> None:
+    section_store = InMemorySectionStore()
+    markdown = "# Parent\nParent text\n\n## Child\nChild text"
+    document = MarkdownSkeletonParser().parse(doc_id="manual", markdown=markdown)
+
+    section_store.store_document(document)
+
+    parent_section = section_store.get_section("manual", "manual:n1")
+    child_section = section_store.get_section("manual", "manual:n2")
+    assert parent_section.start_offset == 0
+    assert parent_section.end_offset == len(markdown)
+    assert parent_section.end_offset >= child_section.end_offset
+
+
+def test_section_without_offset_metadata_serializes_successfully() -> None:
+    section = Section(
+        doc_id="doc",
+        node_id="doc:n1",
+        breadcrumb=("Title",),
+        text="Some text",
+    )
+    assert section.citation is None
+    assert section.start_offset is None
+    assert section.end_offset is None

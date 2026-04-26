@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 from core.application.ports.section_source import SectionSourcePort
-from core.domain.models import Document, Section
+from core.domain.models import Document, DocumentNode, Section
+
+
+def _build_citation(node: DocumentNode) -> str:
+    if node.level <= 0:
+        return node.title
+    return f"{'#' * node.level} {node.title}"
 
 
 class InMemorySectionStore(SectionSourcePort):
@@ -11,18 +17,29 @@ class InMemorySectionStore(SectionSourcePort):
     def store_document(self, document: Document) -> None:
         nodes = list(document.nodes)
         for index, node in enumerate(nodes):
-            descendant_text = [
-                candidate.section_text
+            descendants = [
+                candidate
                 for candidate in nodes[index + 1 :]
                 if candidate.level > node.level
                 and candidate.breadcrumb[: len(node.breadcrumb)] == node.breadcrumb
             ]
+            descendant_text = [candidate.section_text for candidate in descendants]
             section_text = "\n\n".join([node.section_text, *descendant_text]).strip()
+
+            end_char = (
+                max(d.end_char for d in descendants if d.end_char is not None)
+                if descendants
+                else node.end_char
+            )
+
             self._sections[(document.doc_id, node.node_id)] = Section(
                 doc_id=document.doc_id,
                 node_id=node.node_id,
                 breadcrumb=node.breadcrumb,
                 text=section_text,
+                citation=_build_citation(node),
+                start_offset=node.start_char,
+                end_offset=end_char,
             )
 
     def delete_document(self, doc_id: str) -> None:

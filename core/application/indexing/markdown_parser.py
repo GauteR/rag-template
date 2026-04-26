@@ -10,6 +10,12 @@ class MarkdownSkeletonParser:
 
     def parse(self, *, doc_id: str, markdown: str) -> Document:
         lines = markdown.splitlines()
+        char_positions: list[int] = []
+        pos = 0
+        for line in lines:
+            char_positions.append(pos)
+            pos += len(line) + 1  # +1 for the newline character
+
         heading_indices = [
             (index, match)
             for index, line in enumerate(lines)
@@ -28,6 +34,8 @@ class MarkdownSkeletonParser:
                         content=markdown,
                         parent_id=None,
                         breadcrumb=(doc_id,),
+                        start_char=0,
+                        end_char=len(markdown),
                     ),
                 ),
             )
@@ -41,9 +49,16 @@ class MarkdownSkeletonParser:
                 heading_indices[order][0] if order < len(heading_indices) else len(lines)
             )
             content_lines = lines[line_index + 1 : next_line_index]
-            if order == 1 and line_index > 0:
+            leading_content = order == 1 and line_index > 0
+            if leading_content:
                 content_lines = [*lines[:line_index], *content_lines]
             content = "\n".join(content_lines).strip()
+
+            section_start_line = 0 if leading_content else line_index
+            start_char = char_positions[section_start_line] if char_positions else 0
+            end_char = (
+                char_positions[next_line_index] if next_line_index < len(lines) else len(markdown)
+            )
 
             while stack and stack[-1].level >= level:
                 stack.pop()
@@ -59,6 +74,8 @@ class MarkdownSkeletonParser:
                 content=content,
                 parent_id=parent.node_id if parent else None,
                 breadcrumb=breadcrumb,
+                start_char=start_char,
+                end_char=end_char,
             )
             nodes.append(node)
             stack.append(node)

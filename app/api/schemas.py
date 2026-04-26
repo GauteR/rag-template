@@ -27,6 +27,9 @@ class QuerySourceResponse(BaseModel):
     breadcrumb: list[str]
     score: float
     text: str
+    citation: str | None = None
+    start_offset: int | None = None
+    end_offset: int | None = None
 
 
 class QueryResponseModel(BaseModel):

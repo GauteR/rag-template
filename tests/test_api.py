@@ -117,6 +117,25 @@ def test_health_reports_inconsistent_index(tmp_path) -> None:
     assert body["index_document_count"] == 1
 
 
+def test_health_returns_degraded_when_index_inspection_raises(tmp_path) -> None:
+    container = AppContainer(settings=Settings(index_dir=tmp_path))
+    client = TestClient(create_app(container=container))
+
+    # Corrupt the section store's backing file so doc_ids() raises
+    sections_path = tmp_path / "sections.json"
+    sections_path.write_text("not-valid-json", encoding="utf-8")
+    # Force a fresh section_store that reads the corrupt file
+    container.__dict__.pop("section_store", None)
+
+    response = client.get("/v1/health")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "degraded"
+    assert body["index_ready"] is False
+    assert any("Index inspection failed" in err for err in body["config_errors"])
+
+
 def test_index_markdown_and_query_api_flow(tmp_path) -> None:
     container = AppContainer(settings=Settings(index_dir=tmp_path))
     client = TestClient(create_app(container=container))

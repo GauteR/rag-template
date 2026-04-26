@@ -47,11 +47,19 @@ ContainerDependency = Depends(get_authorized_container)
 @router.get("/health", response_model=HealthResponse)
 def health(container: AppContainer = ContainerDependency) -> HealthResponse:
     config_errors = container.collect_config_errors()
-    vector_doc_ids = container.vector_store.doc_ids()
-    section_doc_ids = container.section_store.doc_ids()
-    index_document_count = len(vector_doc_ids)
-    index_consistent = vector_doc_ids == section_doc_ids
-    index_ready = index_document_count > 0 and index_consistent
+    index_document_count = 0
+    index_consistent = False
+    index_ready = False
+
+    try:
+        vector_doc_ids = container.vector_store.doc_ids()
+        section_doc_ids = container.section_store.doc_ids()
+        index_document_count = len(vector_doc_ids)
+        index_consistent = vector_doc_ids == section_doc_ids
+        index_ready = index_document_count > 0 and index_consistent
+    except Exception as exc:
+        config_errors.append(f"Index inspection failed: {exc}")
+
     return HealthResponse(
         status="ok" if not config_errors else "degraded",
         routing_provider=container.settings.routing_provider,

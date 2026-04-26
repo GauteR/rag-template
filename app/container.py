@@ -38,7 +38,10 @@ class AppContainer:
 
     @cached_property
     def vector_store(self) -> FaissVectorStore:
-        return FaissVectorStore(dimension=self.settings.embedding_dimension)
+        return FaissVectorStore(
+            dimension=self.settings.embedding_dimension,
+            index_path=self.settings.faiss_index_path,
+        )
 
     @cached_property
     def section_store(self) -> JsonSectionStore:

@@ -26,6 +26,7 @@ class BenchmarkRow:
     latency_ms: float
     retrieved_node_ids: tuple[str, ...]
     hit_at_k_final: bool | None
+    judge_score: float | None = None
 
 
 @dataclass(frozen=True)

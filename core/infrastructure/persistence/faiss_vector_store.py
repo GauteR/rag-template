@@ -86,6 +86,11 @@ class FaissVectorStore(VectorStorePort):
             return self._fallback.count()
         return len(self._records)
 
+    def doc_ids(self) -> set[str]:
+        if self._index is None:
+            return self._fallback.doc_ids()
+        return {record.doc_id for record in self._records}
+
     def _rebuild_index(self) -> None:
         if self._faiss is None:
             return

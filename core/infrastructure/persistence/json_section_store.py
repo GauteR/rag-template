@@ -40,6 +40,9 @@ class JsonSectionStore(SectionSourcePort):
     def get_section(self, doc_id: str, node_id: str) -> Section:
         return self._sections[(doc_id, node_id)]
 
+    def doc_ids(self) -> set[str]:
+        return {doc_id for doc_id, _ in self._sections}
+
     def _load(self) -> None:
         if not self._path.exists():
             return

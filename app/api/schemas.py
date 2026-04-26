@@ -36,6 +36,10 @@ class QueryResponseModel(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str
+    routing_provider: str
     llm_provider: str
     embedding_provider: str
+    index_document_count: int
     index_ready: bool
+    index_consistent: bool
+    config_errors: list[str] = Field(default_factory=list)

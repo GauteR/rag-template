@@ -50,6 +50,14 @@ class ChromaVectorStore(VectorStorePort):
         )
         return self._map_result(result)
 
+    def count(self) -> int:
+        return self._collection.count()
+
+    def doc_ids(self) -> set[str]:
+        result = self._collection.get(include=["metadatas"])
+        metadatas: list[dict[str, str]] = result.get("metadatas") or []
+        return {m["doc_id"] for m in metadatas if "doc_id" in m}
+
     def _build_collection(self, *, host: str, port: int, collection_name: str) -> Any:
         try:
             import chromadb

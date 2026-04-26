@@ -7,6 +7,7 @@ from dataclasses import asdict
 from pathlib import Path
 from time import gmtime, perf_counter, strftime
 
+from core.application.benchmarking.judge import BenchmarkJudgePort
 from core.application.benchmarking.models import (
     BenchmarkArtifacts,
     BenchmarkQuestion,
@@ -17,8 +18,14 @@ from core.application.benchmarking.models import (
 
 
 class BenchmarkRunner:
-    def __init__(self, *, query_use_case_factory: Callable[[ModelProfile], object]) -> None:
+    def __init__(
+        self,
+        *,
+        query_use_case_factory: Callable[[ModelProfile], object],
+        judge: BenchmarkJudgePort | None = None,
+    ) -> None:
         self._query_use_case_factory = query_use_case_factory
+        self._judge = judge
 
     def run(
         self,
@@ -42,6 +49,14 @@ class BenchmarkRunner:
                 )
                 latency_ms = (perf_counter() - start) * 1_000
                 retrieved_node_ids = tuple(source.node_id for source in response.sources)
+
+                judge_score: float | None = None
+                if self._judge is not None:
+                    judge_score = self._judge.score(
+                        question=question.question,
+                        answer=response.answer,
+                    )
+
                 rows.append(
                     BenchmarkRow(
                         profile_name=profile.name,
@@ -51,6 +66,7 @@ class BenchmarkRunner:
                         hit_at_k_final=self._hit_at_k(
                             question.expected_node_ids, retrieved_node_ids
                         ),
+                        judge_score=judge_score,
                     )
                 )
         return BenchmarkResult(rows=rows)
@@ -82,6 +98,7 @@ class BenchmarkRunner:
                     "latency_ms",
                     "retrieved_node_ids",
                     "hit_at_k_final",
+                    "judge_score",
                 ],
             )
             writer.writeheader()

@@ -114,6 +114,9 @@ def query(
                 breadcrumb=list(source.breadcrumb),
                 score=source.score,
                 text=source.text,
+                citation=source.citation,
+                start_offset=source.start_offset,
+                end_offset=source.end_offset,
             )
             for source in result.sources
         ],

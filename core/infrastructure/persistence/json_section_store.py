@@ -16,18 +16,29 @@ class JsonSectionStore(SectionSourcePort):
     def store_document(self, document: Document) -> None:
         nodes = list(document.nodes)
         for index, node in enumerate(nodes):
-            descendant_text = [
-                candidate.section_text
+            descendants = [
+                candidate
                 for candidate in nodes[index + 1 :]
                 if candidate.level > node.level
                 and candidate.breadcrumb[: len(node.breadcrumb)] == node.breadcrumb
             ]
+            descendant_text = [candidate.section_text for candidate in descendants]
             section_text = "\n\n".join([node.section_text, *descendant_text]).strip()
+
+            end_char = (
+                max(d.end_char for d in descendants if d.end_char is not None)
+                if descendants
+                else node.end_char
+            )
+
             self._sections[(document.doc_id, node.node_id)] = Section(
                 doc_id=document.doc_id,
                 node_id=node.node_id,
                 breadcrumb=node.breadcrumb,
                 text=section_text,
+                citation=node.citation,
+                start_offset=node.start_char,
+                end_offset=end_char,
             )
         self._save()
 
@@ -53,6 +64,9 @@ class JsonSectionStore(SectionSourcePort):
                 node_id=item["node_id"],
                 breadcrumb=tuple(item["breadcrumb"]),
                 text=item["text"],
+                citation=item.get("citation"),
+                start_offset=item.get("start_offset"),
+                end_offset=item.get("end_offset"),
             )
             for item in raw_sections
         }
@@ -65,6 +79,9 @@ class JsonSectionStore(SectionSourcePort):
                 "node_id": section.node_id,
                 "breadcrumb": list(section.breadcrumb),
                 "text": section.text,
+                "citation": section.citation,
+                "start_offset": section.start_offset,
+                "end_offset": section.end_offset,
             }
             for section in self._sections.values()
         ]

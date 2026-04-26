@@ -155,6 +155,11 @@ def test_index_markdown_and_query_api_flow(tmp_path) -> None:
     body = query_response.json()
     assert body["sources"][0]["node_id"] == "manual:n2"
     assert "Install with uv" in body["answer"]
+    source = body["sources"][0]
+    assert source["citation"] == "## Install"
+    assert source["start_offset"] is not None
+    assert source["end_offset"] is not None
+    assert source["start_offset"] < source["end_offset"]
 
 
 def test_query_remains_consistent_after_container_restart(tmp_path) -> None:

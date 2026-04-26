@@ -13,6 +13,14 @@ class DocumentNode:
     content: str
     parent_id: str | None
     breadcrumb: tuple[str, ...]
+    start_char: int | None = None
+    end_char: int | None = None
+
+    @property
+    def citation(self) -> str:
+        if self.level <= 0:
+            return self.title
+        return f"{'#' * self.level} {self.title}"
 
     @property
     def section_text(self) -> str:
@@ -44,6 +52,9 @@ class Section:
     node_id: str
     breadcrumb: tuple[str, ...]
     text: str
+    citation: str | None = None
+    start_offset: int | None = None
+    end_offset: int | None = None
 
 
 @dataclass(frozen=True)

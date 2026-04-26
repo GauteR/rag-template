@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     def synthesis_provider(self) -> str:
         return self.llm_synthesis_provider or self.llm_provider
 
+    @property
+    def faiss_index_path(self) -> Path:
+        return self.index_dir / "vectors.faiss"
+
     def validate_provider_ids(
         self,
         *,

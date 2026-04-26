@@ -48,6 +48,25 @@ def test_index_markdown_and_query_api_flow(tmp_path) -> None:
     assert "Install with uv" in body["answer"]
 
 
+def test_query_remains_consistent_after_container_restart(tmp_path) -> None:
+    first_container = AppContainer(settings=Settings(index_dir=tmp_path))
+    first_client = TestClient(create_app(container=first_container))
+    first_client.post(
+        "/v1/index/markdown",
+        json={"doc_id": "manual", "markdown": "# Intro\nWelcome\n\n## Install\nInstall with uv"},
+    )
+
+    restarted_container = AppContainer(settings=Settings(index_dir=tmp_path))
+    restarted_client = TestClient(create_app(container=restarted_container))
+    query_response = restarted_client.post(
+        "/v1/query",
+        json={"question": "How do I install?", "k_recall": 10, "k_candidates": 5, "k_final": 1},
+    )
+
+    assert query_response.status_code == 200
+    assert query_response.json()["sources"][0]["node_id"] == "manual:n2"
+
+
 def test_api_key_header_is_required_when_configured(tmp_path) -> None:
     container = AppContainer(settings=Settings(api_key="secret", index_dir=tmp_path))
     client = TestClient(create_app(container=container))

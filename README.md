@@ -129,6 +129,9 @@ MAX_UPLOAD_MB=5
 API_KEY=
 ```
 
+FAISS vectors are persisted under `INDEX_DIR` as `vectors.faiss` (with companion
+`vectors.records.json` metadata) so indexed content survives service restarts.
+
 Provider IDs currently registered:
 
 - LLM: `echo`, `ollama`, `openai_compatible`, `anthropic`

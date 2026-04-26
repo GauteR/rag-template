@@ -315,4 +315,5 @@ runner.write_artifacts(result=result, output_dir=Path("benchmarks/out"))
 uv run --python 3.11 --extra dev pytest
 uv run --python 3.11 --extra dev ruff check .
 uv run --python 3.11 --extra dev ruff format --check .
+uv run --python 3.11 --extra dev lint-imports
 ```

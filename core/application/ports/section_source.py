@@ -14,3 +14,6 @@ class SectionSourcePort(Protocol):
 
     def get_section(self, doc_id: str, node_id: str) -> Section:
         """Fetch a full section by document and node ID."""
+
+    def doc_ids(self) -> set[str]:
+        """Return the set of document IDs that have persisted sections."""

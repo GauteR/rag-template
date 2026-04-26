@@ -101,8 +101,8 @@ def test_benchmark_judge_disabled_by_default() -> None:
     assert result.rows[0].judge_score is None
 
 
-def test_benchmark_judge_disabled_produces_no_judge_calls() -> None:
-    """BenchmarkRunner without a judge must never invoke any judge."""
+def test_benchmark_judge_enabled_calls_llm_once_per_question() -> None:
+    """When a judge is wired in, the underlying LLM must be called once per question."""
     call_log: list[str] = []
 
     class SpyLlm(LlmPort):
@@ -118,7 +118,11 @@ def test_benchmark_judge_disabled_produces_no_judge_calls() -> None:
             call_log.append(question)
             return "0.9"
 
-    runner = BenchmarkRunner(query_use_case_factory=lambda _profile: StaticQueryUseCase())
+    judge = LlmBenchmarkJudge(llm=SpyLlm())
+    runner = BenchmarkRunner(
+        query_use_case_factory=lambda _profile: StaticQueryUseCase(),
+        judge=judge,
+    )
     runner.run(
         profiles=[
             ModelProfile(
@@ -134,8 +138,8 @@ def test_benchmark_judge_disabled_produces_no_judge_calls() -> None:
         k_final=1,
     )
 
-    # SpyLlm was never passed to the runner, so it should never be called.
-    assert call_log == []
+    # SpyLlm.synthesize must be called exactly once (one question, one judge invocation).
+    assert len(call_log) == 1
 
 
 # ---------------------------------------------------------------------------

@@ -4,7 +4,6 @@ import re
 from typing import Protocol
 
 from core.application.ports.llm import LlmPort
-from core.domain.models import Section
 
 _JUDGE_PROMPT_TEMPLATE = (
     "You are an impartial benchmark judge. "

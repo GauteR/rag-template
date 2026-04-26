@@ -1,0 +1,20 @@
+# Benchmark questions
+#
+# Each entry defines a question that will be posed to every model profile.
+# The optional `expected_node_ids` list enables retrieval-hit metrics
+# (hit@k_final) when the answer is known to come from specific nodes.
+
+questions:
+  - id: q1
+    question: How do I install the template?
+    expected_node_ids:
+      - docs:install:n1
+
+  - id: q2
+    question: What vector stores are supported?
+    expected_node_ids:
+      - docs:vectorstores:n1
+
+  - id: q3
+    question: How does the query pipeline work?
+    expected_node_ids: []

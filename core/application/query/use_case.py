@@ -50,6 +50,9 @@ class QueryUseCase:
                 breadcrumb=section.breadcrumb,
                 score=scores_by_node_id.get(section.node_id, 0.0),
                 text=section.text,
+                citation=section.citation,
+                start_offset=section.start_offset,
+                end_offset=section.end_offset,
             )
             for section in final_sections
         ]

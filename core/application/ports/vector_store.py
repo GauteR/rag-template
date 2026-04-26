@@ -14,3 +14,9 @@ class VectorStorePort(Protocol):
 
     def search(self, embedding: list[float], *, limit: int) -> list[SearchHit]:
         """Return the nearest records for the query vector."""
+
+    def count(self) -> int:
+        """Return the total number of stored vectors."""
+
+    def doc_ids(self) -> set[str]:
+        """Return the set of document IDs present in the vector index."""

@@ -129,6 +129,9 @@ MAX_UPLOAD_MB=5
 API_KEY=
 ```
 
+FAISS vectors are persisted under `INDEX_DIR` as `vectors.faiss` (with companion
+`vectors.records.json` metadata) so indexed content survives service restarts.
+
 Provider IDs currently registered:
 
 - LLM: `echo`, `ollama`, `openai_compatible`, `anthropic`
@@ -312,4 +315,5 @@ runner.write_artifacts(result=result, output_dir=Path("benchmarks/out"))
 uv run --python 3.11 --extra dev pytest
 uv run --python 3.11 --extra dev ruff check .
 uv run --python 3.11 --extra dev ruff format --check .
+uv run --python 3.11 --extra dev lint-imports
 ```

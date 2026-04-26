@@ -1,0 +1,32 @@
+# Benchmark model matrix configuration
+#
+# Each profile under `profiles` defines a named set of providers to compare.
+# All profiles are evaluated against the same `questions.yaml` with identical
+# retrieval settings so the results are directly comparable.
+#
+# Run locally (no live credentials required for mock providers):
+#   python benchmarks/run_matrix.py
+
+retrieval:
+  k_recall: 10
+  k_candidates: 5
+  k_final: 1
+
+profiles:
+  - name: echo-hash-a
+    llm_routing_provider: echo
+    llm_synthesis_provider: echo
+    embedding_provider: hash
+
+  - name: echo-hash-b
+    llm_routing_provider: echo
+    llm_synthesis_provider: echo
+    embedding_provider: hash
+
+# Uncomment the entries below and set provider credentials to compare live models.
+# Keep live profiles behind the `live_models` pytest marker so CI stays fast.
+#
+#  - name: openai-gpt4o
+#    llm_routing_provider: openai
+#    llm_synthesis_provider: openai
+#    embedding_provider: openai

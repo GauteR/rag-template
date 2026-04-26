@@ -50,6 +50,27 @@ class ChromaVectorStore(VectorStorePort):
         )
         return self._map_result(result)
 
+    def count(self) -> int:
+        return self._collection.count()
+
+    def doc_ids(self) -> set[str]:
+        batch_size = 1000
+        total = self._collection.count()
+        ids: set[str] = set()
+
+        for offset in range(0, max(total, 1), batch_size):
+            result = self._collection.get(
+                include=["metadatas"],
+                limit=batch_size,
+                offset=offset,
+            )
+            metadatas: list[dict[str, str]] = result.get("metadatas") or []
+            if not metadatas:
+                break
+            ids.update(m["doc_id"] for m in metadatas if "doc_id" in m)
+
+        return ids
+
     def _build_collection(self, *, host: str, port: int, collection_name: str) -> Any:
         try:
             import chromadb

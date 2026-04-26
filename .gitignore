@@ -81,3 +81,5 @@ dmypy.json
 Thumbs.db
 *.log
 *.ipynb_checkpoints
+
+.cursor/plans/

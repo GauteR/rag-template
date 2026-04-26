@@ -18,11 +18,22 @@ from core.infrastructure.persistence.json_section_store import JsonSectionStore
 class AppContainer:
     def __init__(self, *, settings: Settings | None = None) -> None:
         self.settings = settings or Settings()
-        self.settings.validate_provider_ids(
-            llm_provider_ids=llm_registry.provider_ids(),
-            embedding_provider_ids=embedding_registry.provider_ids(),
-        )
-        self.settings.validate_provider_configuration()
+
+    def collect_config_errors(self) -> list[str]:
+        """Return a list of configuration error messages without raising or exposing secrets."""
+        errors: list[str] = []
+        try:
+            self.settings.validate_provider_ids(
+                llm_provider_ids=llm_registry.provider_ids(),
+                embedding_provider_ids=embedding_registry.provider_ids(),
+            )
+        except ValueError as exc:
+            errors.append(str(exc))
+        try:
+            self.settings.validate_provider_configuration()
+        except ValueError as exc:
+            errors.append(str(exc))
+        return errors
 
     @cached_property
     def embedder(self):
@@ -38,7 +49,10 @@ class AppContainer:
 
     @cached_property
     def vector_store(self) -> FaissVectorStore:
-        return FaissVectorStore(dimension=self.settings.embedding_dimension)
+        return FaissVectorStore(
+            dimension=self.settings.embedding_dimension,
+            index_path=self.settings.faiss_index_path,
+        )
 
     @cached_property
     def section_store(self) -> JsonSectionStore:

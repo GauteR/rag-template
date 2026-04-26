@@ -10,6 +10,9 @@ class QuerySource:
     breadcrumb: tuple[str, ...]
     score: float
     text: str
+    citation: str | None = None
+    start_offset: int | None = None
+    end_offset: int | None = None
 
 
 @dataclass(frozen=True)

@@ -15,9 +15,25 @@ class OllamaEmbedder(EmbedderPort):
         with httpx.Client(timeout=30) as client:
             for text in texts:
                 response = client.post(
-                    f"{self._base_url}/api/embeddings",
-                    json={"model": self._model, "prompt": text},
+                    f"{self._base_url}/api/embed",
+                    json={"model": self._model, "input": text},
                 )
+                if response.status_code == 404:
+                    response = client.post(
+                        f"{self._base_url}/api/embeddings",
+                        json={"model": self._model, "prompt": text},
+                    )
                 response.raise_for_status()
-                embeddings.append(response.json()["embedding"])
+                payload = response.json()
+                if isinstance(payload.get("embedding"), list):
+                    embeddings.append(payload["embedding"])
+                    continue
+                if (
+                    isinstance(payload.get("embeddings"), list)
+                    and payload["embeddings"]
+                    and isinstance(payload["embeddings"][0], list)
+                ):
+                    embeddings.append(payload["embeddings"][0])
+                    continue
+                raise ValueError("Unexpected Ollama embedding response format")
         return embeddings

@@ -5,6 +5,11 @@ def test_create_mcp_server_registers_rag_tools() -> None:
     server = create_mcp_server(base_url="http://rag.local", api_key="secret")
 
     assert server.name == "rag_template_mcp"
-    assert {"rag_health", "rag_index_markdown", "rag_index_pdf", "rag_query"}.issubset(
-        server.tool_names
-    )
+    expected_tools = {
+        "rag_health",
+        "rag_index_markdown",
+        "rag_index_pdf",
+        "rag_query",
+        "rag_delete_index",
+    }
+    assert expected_tools.issubset(server.tool_names)

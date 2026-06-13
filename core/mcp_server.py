@@ -90,6 +90,12 @@ class IndexPdfInput(BaseModel):
     )
 
 
+class DeleteIndexInput(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    doc_id: str = Field(..., min_length=1, description="Document identifier to delete.")
+
+
 class QueryInput(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -146,6 +152,9 @@ class RagApiClient:
             },
         )
 
+    async def delete_index(self, *, doc_id: str) -> dict[str, Any]:
+        return await self._request("DELETE", f"/v1/index/{doc_id}")
+
     async def _request(self, method: str, path: str, **kwargs) -> dict[str, Any]:
         try:
             async with httpx.AsyncClient(base_url=self._base_url, headers=self._headers) as client:
@@ -200,9 +209,7 @@ def create_mcp_server(
         try:
             content = base64.b64decode(params.content_base64, validate=True)
         except (ValueError, binascii.Error) as exc:
-            raise RuntimeError(
-                "Failed to decode content_base64: invalid base64 format."
-            ) from exc
+            raise RuntimeError("Failed to decode content_base64: invalid base64 format.") from exc
         return await client.index_pdf(
             filename=params.filename,
             content=content,
@@ -222,7 +229,23 @@ def create_mcp_server(
             k_final=params.k_final,
         )
 
+    @server.tool(
+        name="rag_delete_index",
+        annotations={"readOnlyHint": False, "destructiveHint": True, "idempotentHint": True},
+    )
+    async def rag_delete_index(params: DeleteIndexInput) -> dict[str, Any]:
+        """Delete a document from the index when ENABLE_INDEX_ADMIN=true."""
+        return await client.delete_index(doc_id=params.doc_id)
+
     return server
+
+
+async def verify_api_health(*, base_url: str, api_key: str | None = None) -> None:
+    client = RagApiClient(base_url=base_url, api_key=api_key)
+    health = await client.health()
+    if health.get("status") != "ok":
+        errors = health.get("config_errors", [])
+        raise RuntimeError(f"RAG API health check failed: {errors}")
 
 
 def main() -> None:
@@ -230,7 +253,13 @@ def main() -> None:
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument("--api-key", default=None)
     parser.add_argument("--transport", choices=["stdio", "streamable-http"], default="stdio")
+    parser.add_argument("--skip-health-check", action="store_true")
     args = parser.parse_args()
+
+    if not args.skip_health_check:
+        import asyncio
+
+        asyncio.run(verify_api_health(base_url=args.base_url, api_key=args.api_key))
 
     create_mcp_server(base_url=args.base_url, api_key=args.api_key, runtime=True).run(
         transport=args.transport

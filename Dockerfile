@@ -12,7 +12,7 @@ COPY pyproject.toml uv.lock README.md ./
 COPY app ./app
 COPY core ./core
 
-RUN uv pip install --system ".[chroma,mcp]"
+RUN uv pip install --system ".[faiss,chroma,mcp]"
 
 EXPOSE 8000
 

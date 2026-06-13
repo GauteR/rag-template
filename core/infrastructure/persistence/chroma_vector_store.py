@@ -71,6 +71,27 @@ class ChromaVectorStore(VectorStorePort):
 
         return ids
 
+    def chunk_counts_by_doc(self) -> dict[str, int]:
+        batch_size = 1000
+        total = self._collection.count()
+        counts: dict[str, int] = {}
+
+        for offset in range(0, max(total, 1), batch_size):
+            result = self._collection.get(
+                include=["metadatas"],
+                limit=batch_size,
+                offset=offset,
+            )
+            metadatas: list[dict[str, str]] = result.get("metadatas") or []
+            if not metadatas:
+                break
+            for metadata in metadatas:
+                doc_id = metadata.get("doc_id")
+                if doc_id:
+                    counts[doc_id] = counts.get(doc_id, 0) + 1
+
+        return counts
+
     def _build_collection(self, *, host: str, port: int, collection_name: str) -> Any:
         try:
             import chromadb

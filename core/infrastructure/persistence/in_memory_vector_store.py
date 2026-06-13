@@ -35,6 +35,12 @@ class InMemoryVectorStore(VectorStorePort):
     def doc_ids(self) -> set[str]:
         return {record.doc_id for record in self._records}
 
+    def chunk_counts_by_doc(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for record in self._records:
+            counts[record.doc_id] = counts.get(record.doc_id, 0) + 1
+        return counts
+
     def _cosine_similarity(self, left: list[float], right: list[float]) -> float:
         left_norm = math.sqrt(sum(value * value for value in left))
         right_norm = math.sqrt(sum(value * value for value in right))

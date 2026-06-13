@@ -46,3 +46,9 @@ class InMemorySectionStore(SectionSourcePort):
 
     def doc_ids(self) -> set[str]:
         return {doc_id for doc_id, _ in self._sections}
+
+    def section_counts_by_doc(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for doc_id, _ in self._sections:
+            counts[doc_id] = counts.get(doc_id, 0) + 1
+        return counts

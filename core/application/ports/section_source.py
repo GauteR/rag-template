@@ -17,3 +17,6 @@ class SectionSourcePort(Protocol):
 
     def doc_ids(self) -> set[str]:
         """Return the set of document IDs that have persisted sections."""
+
+    def section_counts_by_doc(self) -> dict[str, int]:
+        """Return section counts grouped by document ID."""

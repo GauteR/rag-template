@@ -109,6 +109,17 @@ class FaissVectorStore(VectorStorePort):
             return self._fallback.doc_ids()
         return {record.doc_id for record in self._records}
 
+    def chunk_counts_by_doc(self) -> dict[str, int]:
+        if self._index is None:
+            return self._fallback.chunk_counts_by_doc()
+        counts: dict[str, int] = {}
+        for record in self._records:
+            counts[record.doc_id] = counts.get(record.doc_id, 0) + 1
+        return counts
+
+    def is_faiss_loaded(self) -> bool:
+        return self._index is not None
+
     def _rebuild_index(self) -> None:
         if self._faiss is None:
             return
@@ -175,8 +186,7 @@ class FaissVectorStore(VectorStorePort):
                 self._faiss.write_index(self._index, str(self._index_path))
         if self._index.d != self._dimension:
             raise ValueError(
-                "FAISS index dimension mismatch: "
-                f"expected {self._dimension}, got {self._index.d}"
+                f"FAISS index dimension mismatch: expected {self._dimension}, got {self._index.d}"
             )
         if self._index.ntotal != len(self._records):
             raise ValueError(

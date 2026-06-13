@@ -5,6 +5,7 @@ from core.application.indexing.markdown_parser import MarkdownSkeletonParser
 from core.application.indexing.models import IndexMarkdownResult
 from core.application.indexing.noise_filter import NoiseFilter
 from core.application.ports.embeddings import EmbedderPort
+from core.application.ports.lexical_store import LexicalStorePort
 from core.application.ports.section_source import SectionSourcePort
 from core.application.ports.vector_store import VectorStorePort
 from core.domain.models import VectorRecord
@@ -20,6 +21,7 @@ class IndexMarkdownUseCase:
         vector_store: VectorStorePort,
         section_source: SectionSourcePort,
         noise_filter: NoiseFilter | None = None,
+        lexical_store: LexicalStorePort | None = None,
     ) -> None:
         self._parser = parser
         self._chunker = chunker
@@ -27,6 +29,7 @@ class IndexMarkdownUseCase:
         self._vector_store = vector_store
         self._section_source = section_source
         self._noise_filter = noise_filter
+        self._lexical_store = lexical_store
 
     def execute(self, *, doc_id: str, markdown: str) -> IndexMarkdownResult:
         document = self._parser.parse(doc_id=doc_id, markdown=markdown)
@@ -48,8 +51,15 @@ class IndexMarkdownUseCase:
         ]
         self._section_source.delete_document(doc_id)
         self._vector_store.delete_document(doc_id)
+        if self._lexical_store is not None:
+            self._lexical_store.delete_document(doc_id)
         self._section_source.store_document(document)
         self._vector_store.add(records)
+        if self._lexical_store is not None:
+            self._lexical_store.index_document(
+                doc_id=doc_id,
+                records=[(chunk.node_id, chunk.chunk_id, chunk.text) for chunk in chunks],
+            )
 
         return IndexMarkdownResult(
             doc_id=doc_id,

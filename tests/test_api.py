@@ -27,6 +27,7 @@ def test_health_reports_configured_providers(tmp_path) -> None:
     assert body["llm_provider"] == "echo"
     assert body["routing_provider"] == "echo"
     assert body["embedding_provider"] == "hash"
+    assert body["vector_store_provider"] == "faiss"
     assert body["status"] == "ok"
     assert body["config_errors"] == []
 
@@ -55,9 +56,9 @@ def test_health_reports_degraded_for_missing_required_config(tmp_path) -> None:
     body = response.json()
     assert body["status"] == "degraded"
     assert any("ANTHROPIC_API_KEY" in err for err in body["config_errors"])
-    assert not any(
-        secret in str(body) for secret in ["sk-", "anthropic-", "Bearer"]
-    ), "Health response must not expose secret values"
+    assert not any(secret in str(body) for secret in ["sk-", "anthropic-", "Bearer"]), (
+        "Health response must not expose secret values"
+    )
 
 
 def test_health_reports_empty_index(tmp_path) -> None:

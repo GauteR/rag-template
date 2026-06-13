@@ -1,0 +1,44 @@
+# Reference workflow for GitHub Actions.
+# Prefer pre-commit locally when Actions is unavailable:
+#   uv run pre-commit install && uv run pre-commit install --hook-type pre-push
+#   bash scripts/ci.sh
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        run: uv sync --python 3.11 --extra dev --extra faiss
+
+      - name: Ruff check
+        run: uv run --python 3.11 --extra dev ruff check .
+
+      - name: Ruff format
+        run: uv run --python 3.11 --extra dev ruff format --check .
+
+      - name: Import linter
+        run: uv run --python 3.11 --extra dev lint-imports
+
+      - name: Pytest
+        run: uv run --python 3.11 --extra dev --extra faiss pytest -m "not live_models"
+
+      - name: Benchmark mock CLI
+        run: uv run --python 3.11 --extra dev python benchmarks/run_matrix.py --mock

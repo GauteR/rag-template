@@ -1,0 +1,38 @@
+# Local quality gates (replaces GitHub Actions when unavailable).
+# Install: uv run pre-commit install && uv run pre-commit install --hook-type pre-push
+# Run all: pre-commit run --all-files && pre-commit run --all-files --hook-stage pre-push
+
+default_install_hook_types: [pre-commit, pre-push]
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.12
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: lint-imports
+        name: lint-imports
+        entry: uv run --extra dev lint-imports
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: pytest
+        name: pytest (not live_models)
+        entry: uv run --extra dev --extra faiss pytest -m "not live_models"
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
+
+      - id: benchmark-mock
+        name: benchmark mock CLI
+        entry: uv run --extra dev python benchmarks/run_matrix.py --mock
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

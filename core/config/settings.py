@@ -15,10 +15,19 @@ class Settings(BaseSettings):
     embedding_provider: str = "hash"
     embedding_dimension: int = 8
 
+    vector_store_provider: str = "faiss"
+    chroma_host: str = "localhost"
+    chroma_port: int = 8000
+    chroma_collection: str = "rag_template"
+
     enable_llm_noise_filter: bool = False
     enable_llm_reranker: bool = False
     enable_llamaparse: bool = True
     enable_benchmark_judge: bool = False
+    enable_index_admin: bool = False
+    enable_query_tracing: bool = False
+    enable_streaming_query: bool = False
+    enable_hybrid_search: bool = False
 
     index_dir: Path = Field(default=Path(".index"))
     max_upload_mb: int = 5
@@ -52,12 +61,16 @@ class Settings(BaseSettings):
         *,
         llm_provider_ids: set[str],
         embedding_provider_ids: set[str],
+        vector_store_provider_ids: set[str] | None = None,
     ) -> None:
         for provider in {self.routing_provider, self.synthesis_provider}:
             if provider not in llm_provider_ids:
                 raise ValueError(f"Unknown LLM provider: {provider}")
         if self.embedding_provider not in embedding_provider_ids:
             raise ValueError(f"Unknown embedding provider: {self.embedding_provider}")
+        if vector_store_provider_ids is not None:
+            if self.vector_store_provider not in vector_store_provider_ids:
+                raise ValueError(f"Unknown vector store provider: {self.vector_store_provider}")
 
     def validate_provider_configuration(self) -> None:
         if self.embedding_dimension < 1:
@@ -77,3 +90,11 @@ class Settings(BaseSettings):
             raise ValueError("OLLAMA_BASE_URL is required for ollama provider")
         if self.embedding_provider == "ollama" and not self.ollama_base_url:
             raise ValueError("OLLAMA_BASE_URL is required for ollama embeddings")
+
+    def validate_embedding_dimension(self, *, actual_dimension: int) -> None:
+        if actual_dimension != self.embedding_dimension:
+            raise ValueError(
+                "Embedding dimension mismatch: "
+                f"EMBEDDING_DIMENSION={self.embedding_dimension}, "
+                f"provider returned {actual_dimension}"
+            )

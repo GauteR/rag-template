@@ -145,17 +145,7 @@ def list_index(container: AppContainer = ContainerDependency) -> IndexListRespon
 @router.delete("/index/{doc_id}", response_model=DeleteIndexResponse)
 def delete_index(doc_id: str, container: AppContainer = ContainerDependency) -> DeleteIndexResponse:
     _require_index_admin(container)
-    vector_doc_ids = container.vector_store.doc_ids()
-    section_doc_ids = container.section_store.doc_ids()
-    existed = doc_id in vector_doc_ids or doc_id in section_doc_ids
-    container.vector_store.delete_document(doc_id)
-    container.section_store.delete_document(doc_id)
-    if container.settings.enable_hybrid_search:
-        from core.infrastructure.persistence.bm25_lexical_store import Bm25LexicalStore
-
-        lexical_path = container.settings.index_dir / "lexical.json"
-        if lexical_path.exists():
-            Bm25LexicalStore(path=lexical_path).delete_document(doc_id)
+    existed = container.delete_document(doc_id)
     return DeleteIndexResponse(doc_id=doc_id, deleted=existed)
 
 

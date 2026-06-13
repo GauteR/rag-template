@@ -76,13 +76,25 @@ class AppContainer:
     def pdf_extractor(self) -> LlamaParsePdfExtractor:
         return LlamaParsePdfExtractor(api_key=self.settings.llama_cloud_api_key)
 
+    def _lexical_store(self):
+        if not self.settings.enable_hybrid_search:
+            return None
+        from core.infrastructure.persistence.bm25_lexical_store import Bm25LexicalStore
+
+        return Bm25LexicalStore(path=self.settings.index_dir / "lexical.json")
+
+    def delete_document(self, doc_id: str) -> bool:
+        vector_doc_ids = self.vector_store.doc_ids()
+        section_doc_ids = self.section_store.doc_ids()
+        existed = doc_id in vector_doc_ids or doc_id in section_doc_ids
+        self.vector_store.delete_document(doc_id)
+        self.section_store.delete_document(doc_id)
+        lexical_store = self._lexical_store()
+        if lexical_store is not None:
+            lexical_store.delete_document(doc_id)
+        return existed
+
     def index_markdown_use_case(self) -> IndexMarkdownUseCase:
-        lexical_store = None
-        if self.settings.enable_hybrid_search:
-            from core.infrastructure.persistence.bm25_lexical_store import Bm25LexicalStore
-
-            lexical_store = Bm25LexicalStore(path=self.settings.index_dir / "lexical.json")
-
         return IndexMarkdownUseCase(
             parser=MarkdownSkeletonParser(),
             chunker=StructureGuidedChunker(),
@@ -90,7 +102,7 @@ class AppContainer:
             vector_store=self.vector_store,
             section_source=self.section_store,
             noise_filter=self._noise_filter(),
-            lexical_store=lexical_store,
+            lexical_store=self._lexical_store(),
         )
 
     def _noise_filter(self):
@@ -99,12 +111,6 @@ class AppContainer:
         return HeuristicNoiseFilter()
 
     def query_use_case(self) -> QueryUseCase:
-        lexical_store = None
-        if self.settings.enable_hybrid_search:
-            from core.infrastructure.persistence.bm25_lexical_store import Bm25LexicalStore
-
-            lexical_store = Bm25LexicalStore(path=self.settings.index_dir / "lexical.json")
-
         return QueryUseCase(
             embedder=self.embedder,
             vector_store=self.vector_store,
@@ -114,7 +120,7 @@ class AppContainer:
             enable_llm_reranker=self.settings.enable_llm_reranker,
             enable_query_tracing=self.settings.enable_query_tracing,
             enable_hybrid_search=self.settings.enable_hybrid_search,
-            lexical_store=lexical_store,
+            lexical_store=self._lexical_store(),
         )
 
     def faiss_available(self) -> bool:

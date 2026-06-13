@@ -48,6 +48,9 @@ class AnthropicLlm(LlmPort):
         context = "\n\n".join(section.text for section in sections)
         return self._message(f"Answer from context.\nQuestion: {question}\n\n{context}")
 
+    def synthesize_stream(self, *, question: str, sections: list[Section]):
+        yield self.synthesize(question=question, sections=sections)
+
     def _message(self, prompt: str) -> str:
         if not self._api_key:
             raise ValueError("ANTHROPIC_API_KEY is required for anthropic provider")

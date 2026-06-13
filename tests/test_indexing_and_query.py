@@ -35,6 +35,9 @@ class PartialReranker(LlmPort):
         del question
         return "\n".join(section.text for section in sections)
 
+    def synthesize_stream(self, *, question: str, sections: list[Section]):
+        yield self.synthesize(question=question, sections=sections)
+
 
 def test_index_markdown_stores_vectors_and_full_sections() -> None:
     vector_store = InMemoryVectorStore()

@@ -61,6 +61,28 @@ def test_health_reports_degraded_for_missing_required_config(tmp_path) -> None:
     )
 
 
+def test_health_reports_degraded_for_embedding_dimension_mismatch(monkeypatch, tmp_path) -> None:
+    from core.application.ports.embeddings import EmbedderPort
+
+    class WrongDimEmbedder(EmbedderPort):
+        def embed_texts(self, texts: list[str]) -> list[list[float]]:
+            return [[0.0] * 4 for _ in texts]
+
+    monkeypatch.setattr(
+        "app.container.embedding_registry.build",
+        lambda _provider_id, _settings: WrongDimEmbedder(),
+    )
+    container = AppContainer(settings=Settings(index_dir=tmp_path, embedding_dimension=8))
+    client = TestClient(create_app(container=container))
+
+    response = client.get("/v1/health")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "degraded"
+    assert any("EMBEDDING_DIMENSION" in err for err in body["config_errors"])
+
+
 def test_health_reports_empty_index(tmp_path) -> None:
     container = AppContainer(settings=Settings(index_dir=tmp_path))
     client = TestClient(create_app(container=container))

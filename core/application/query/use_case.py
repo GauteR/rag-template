@@ -22,6 +22,13 @@ class _CandidateHit:
     section: Section
 
 
+@dataclass(frozen=True)
+class _PreparedQuery:
+    sources: list[QuerySource]
+    sections: list[Section]
+    metadata: QueryMetadata | None
+
+
 class QueryUseCase:
     def __init__(
         self,
@@ -56,6 +63,62 @@ class QueryUseCase:
         doc_id: str | None = None,
         min_score: float | None = None,
     ) -> QueryResponse:
+        prepared = self._prepare_query(
+            question=question,
+            k_recall=k_recall,
+            k_candidates=k_candidates,
+            k_final=k_final,
+            doc_id=doc_id,
+            min_score=min_score,
+        )
+
+        synth_start = perf_counter()
+        answer = self._synthesize(question=question, sections=prepared.sections)
+        metadata = prepared.metadata
+        if metadata is not None:
+            metadata.synthesize_ms = (perf_counter() - synth_start) * 1_000
+
+        return QueryResponse(answer=answer, sources=prepared.sources, metadata=metadata)
+
+    def synthesize_stream(
+        self,
+        *,
+        question: str,
+        k_recall: int = 200,
+        k_candidates: int = 50,
+        k_final: int = 5,
+        doc_id: str | None = None,
+        min_score: float | None = None,
+    ) -> tuple[list[QuerySource], Iterator[str]]:
+        prepared = self._prepare_query(
+            question=question,
+            k_recall=k_recall,
+            k_candidates=k_candidates,
+            k_final=k_final,
+            doc_id=doc_id,
+            min_score=min_score,
+        )
+
+        if self._synthesis_llm is not None:
+            stream = self._synthesis_llm.synthesize_stream(
+                question=question,
+                sections=prepared.sections,
+            )
+        else:
+            stream = iter([self._synthesize(question=question, sections=prepared.sections)])
+
+        return prepared.sources, stream
+
+    def _prepare_query(
+        self,
+        *,
+        question: str,
+        k_recall: int,
+        k_candidates: int,
+        k_final: int,
+        doc_id: str | None,
+        min_score: float | None,
+    ) -> _PreparedQuery:
         metadata = QueryMetadata() if self._enable_query_tracing else None
         start = perf_counter()
 
@@ -91,6 +154,8 @@ class QueryUseCase:
             metadata.rerank_ms = (perf_counter() - rerank_start) * 1_000
             metadata.candidate_count = len(resolved)
             metadata.final_count = len(final_sections)
+            metadata.enable_llm_reranker = self._enable_llm_reranker
+            metadata.enable_hybrid_search = self._enable_hybrid_search
 
         sources = [
             QuerySource(
@@ -106,50 +171,7 @@ class QueryUseCase:
             for section in final_sections
         ]
 
-        synth_start = perf_counter()
-        answer = self._synthesize(question=question, sections=final_sections)
-        if metadata is not None:
-            metadata.synthesize_ms = (perf_counter() - synth_start) * 1_000
-            metadata.enable_llm_reranker = self._enable_llm_reranker
-            metadata.enable_hybrid_search = self._enable_hybrid_search
-
-        return QueryResponse(answer=answer, sources=sources, metadata=metadata)
-
-    def synthesize_stream(
-        self,
-        *,
-        question: str,
-        k_recall: int = 200,
-        k_candidates: int = 50,
-        k_final: int = 5,
-        doc_id: str | None = None,
-        min_score: float | None = None,
-    ) -> tuple[list[QuerySource], Iterator[str]]:
-        response = self.execute(
-            question=question,
-            k_recall=k_recall,
-            k_candidates=k_candidates,
-            k_final=k_final,
-            doc_id=doc_id,
-            min_score=min_score,
-        )
-        sections = [
-            Section(
-                doc_id=source.doc_id,
-                node_id=source.node_id,
-                breadcrumb=tuple(source.breadcrumb),
-                text=source.text,
-                citation=source.citation,
-                start_offset=source.start_offset,
-                end_offset=source.end_offset,
-            )
-            for source in response.sources
-        ]
-        if self._synthesis_llm is not None and hasattr(self._synthesis_llm, "synthesize_stream"):
-            stream = self._synthesis_llm.synthesize_stream(question=question, sections=sections)
-        else:
-            stream = iter([response.answer])
-        return response.sources, stream
+        return _PreparedQuery(sources=sources, sections=final_sections, metadata=metadata)
 
     def _resolve_sections(self, candidates: list[SearchHit]) -> list[_CandidateHit]:
         resolved: list[_CandidateHit] = []
@@ -171,6 +193,7 @@ class QueryUseCase:
         vector_hits: list[SearchHit],
         lexical_hits: list[SearchHit],
     ) -> list[SearchHit]:
+        # Vector cosine scores and BM25 scores use different scales; keep the higher raw score.
         merged: dict[tuple[str, str], SearchHit] = {}
         for hit in vector_hits + lexical_hits:
             key = (hit.record.doc_id, hit.record.node_id)

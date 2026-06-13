@@ -52,6 +52,7 @@ poetry.lock
 
 # Test output and local server files
 benchmarks/out/
+benchmarks/.benchmark-index/
 .index/
 # Vector DB index directory _configurable_, but add common path:
 core/infrastructure/vectorstore/faiss_index/

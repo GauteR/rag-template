@@ -248,9 +248,7 @@ def test_benchmark_judge_enabled_calls_llm_once_per_question() -> None:
         def filter_noise(self, *, sections: list[Section]) -> set[str]:
             return set()
 
-        def rerank(
-            self, *, question: str, candidates: list[Section], k_final: int
-        ) -> list[str]:
+        def rerank(self, *, question: str, candidates: list[Section], k_final: int) -> list[str]:
             return [s.node_id for s in candidates[:k_final]]
 
         def synthesize(self, *, question: str, sections: list[Section]) -> str:
@@ -293,9 +291,7 @@ def test_benchmark_runner_with_judge_records_scores() -> None:
         def filter_noise(self, *, sections: list[Section]) -> set[str]:
             return set()
 
-        def rerank(
-            self, *, question: str, candidates: list[Section], k_final: int
-        ) -> list[str]:
+        def rerank(self, *, question: str, candidates: list[Section], k_final: int) -> list[str]:
             return [s.node_id for s in candidates[:k_final]]
 
         def synthesize(self, *, question: str, sections: list[Section]) -> str:
@@ -331,9 +327,7 @@ def test_benchmark_runner_with_judge_included_in_artifacts(tmp_path) -> None:
         def filter_noise(self, *, sections: list[Section]) -> set[str]:
             return set()
 
-        def rerank(
-            self, *, question: str, candidates: list[Section], k_final: int
-        ) -> list[str]:
+        def rerank(self, *, question: str, candidates: list[Section], k_final: int) -> list[str]:
             return [s.node_id for s in candidates[:k_final]]
 
         def synthesize(self, *, question: str, sections: list[Section]) -> str:

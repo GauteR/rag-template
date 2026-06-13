@@ -46,9 +46,7 @@ class LlamaParsePdfExtractor(PdfExtractorPort):
                 Path(temp_path).unlink(missing_ok=True)
 
         markdown = "\n\n".join(
-            doc.text.strip()
-            for doc in documents
-            if getattr(doc, "text", None) and doc.text.strip()
+            doc.text.strip() for doc in documents if getattr(doc, "text", None) and doc.text.strip()
         ).strip()
         if not markdown:
             raise ValueError("No extractable content found in PDF.")

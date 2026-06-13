@@ -20,3 +20,6 @@ class VectorStorePort(Protocol):
 
     def doc_ids(self) -> set[str]:
         """Return the set of document IDs present in the vector index."""
+
+    def chunk_counts_by_doc(self) -> dict[str, int]:
+        """Return chunk counts grouped by document ID."""

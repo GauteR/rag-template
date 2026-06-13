@@ -3,6 +3,7 @@ import pytest
 from core.config.settings import Settings
 from core.infrastructure.embeddings.registry import embedding_registry
 from core.infrastructure.llm.registry import llm_registry
+from core.infrastructure.persistence.registry import vector_store_registry
 
 
 def test_default_registries_include_local_and_http_provider_ids() -> None:
@@ -17,11 +18,13 @@ def test_settings_validate_selected_provider_ids() -> None:
         llm_provider="echo",
         embedding_provider="hash",
         embedding_dimension=8,
+        vector_store_provider="faiss",
     )
 
     settings.validate_provider_ids(
         llm_provider_ids=llm_registry.provider_ids(),
         embedding_provider_ids=embedding_registry.provider_ids(),
+        vector_store_provider_ids=vector_store_registry.provider_ids(),
     )
 
 

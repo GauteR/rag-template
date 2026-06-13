@@ -18,3 +18,7 @@ class EchoLlm(LlmPort):
             return "No relevant sections found."
         context = "\n\n".join(section.text for section in sections)
         return f"Question: {question}\n\nContext:\n{context}"
+
+    def synthesize_stream(self, *, question: str, sections: list[Section]):
+        text = self.synthesize(question=question, sections=sections)
+        yield text

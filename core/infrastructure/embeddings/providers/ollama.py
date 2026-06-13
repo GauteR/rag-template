@@ -18,22 +18,41 @@ class OllamaEmbedder(EmbedderPort):
                     f"{self._base_url}/api/embed",
                     json={"model": self._model, "input": text},
                 )
-                if response.status_code == 404:
+                if response.status_code == 404 and self._should_fallback_to_legacy(response):
                     response = client.post(
                         f"{self._base_url}/api/embeddings",
                         json={"model": self._model, "prompt": text},
                     )
+                if response.status_code == 404:
+                    self._raise_model_not_found(response)
                 response.raise_for_status()
-                payload = response.json()
-                if isinstance(payload.get("embedding"), list):
-                    embeddings.append(payload["embedding"])
-                    continue
-                if (
-                    isinstance(payload.get("embeddings"), list)
-                    and payload["embeddings"]
-                    and isinstance(payload["embeddings"][0], list)
-                ):
-                    embeddings.append(payload["embeddings"][0])
-                    continue
-                raise ValueError("Unexpected Ollama embedding response format")
+                embeddings.append(self._parse_embedding_payload(response.json()))
         return embeddings
+
+    def _should_fallback_to_legacy(self, response: httpx.Response) -> bool:
+        try:
+            payload = response.json()
+        except ValueError:
+            return True
+        error = payload.get("error")
+        if isinstance(error, str) and "try pulling it first" in error:
+            return False
+        return True
+
+    def _parse_embedding_payload(self, payload: dict) -> list[float]:
+        if isinstance(payload.get("embedding"), list):
+            return payload["embedding"]
+        embeddings = payload.get("embeddings")
+        if isinstance(embeddings, list) and embeddings and isinstance(embeddings[0], list):
+            return embeddings[0]
+        raise ValueError("Unexpected Ollama embedding response format")
+
+    def _raise_model_not_found(self, response: httpx.Response) -> None:
+        try:
+            payload = response.json()
+            error = payload.get("error")
+            if isinstance(error, str):
+                raise ValueError(f"Ollama embedding request failed: {error}") from None
+        except ValueError:
+            raise
+        response.raise_for_status()

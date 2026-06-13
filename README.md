@@ -16,7 +16,7 @@ answer through a configurable LLM provider.
 Create the environment and install project dependencies:
 
 ```bash
-uv sync --python 3.11 --extra dev
+uv sync --python 3.11 --extra dev --extra faiss
 ```
 
 Copy the example environment file:
@@ -31,6 +31,19 @@ The default configuration works without external API keys:
 LLM_PROVIDER=echo
 EMBEDDING_PROVIDER=hash
 EMBEDDING_DIMENSION=8
+VECTOR_STORE_PROVIDER=faiss
+```
+
+## Quick demo
+
+```bash
+bash scripts/demo.sh
+```
+
+On Windows:
+
+```powershell
+./scripts/demo.ps1
 ```
 
 ## Run the API
@@ -62,16 +75,20 @@ docker build -t rag-template .
 docker run --env-file .env -p 8000:8000 rag-template
 ```
 
-Run the API and an optional ChromaDB sidecar through Docker Compose (the API uses FAISS by default; ChromaDB is available as an optional backend):
+Docker Compose profiles:
 
 ```bash
-docker compose up --build
+# FAISS only (default)
+docker compose up --build rag-api
+
+# ChromaDB sidecar + API wired to Chroma
+docker compose --profile chroma up --build
 ```
 
 Service ports:
 
 - API: `http://127.0.0.1:8000`
-- ChromaDB (sidecar, not used by default): `http://127.0.0.1:8001`
+- ChromaDB (chroma profile): `http://127.0.0.1:8001`
 
 ## Index Markdown
 
@@ -105,8 +122,17 @@ curl -X POST http://127.0.0.1:8000/v1/query \
   }'
 ```
 
+Optional query filters:
+
+- `doc_id`: scope search to one document
+- `min_score`: drop low-scoring Stage 1 hits
+
 Responses include an answer and traceable sources with `doc_id`, `node_id`, breadcrumbs, score, and
-the full section text used for synthesis.
+the full section text used for synthesis. With `ENABLE_QUERY_TRACING=true`, responses also include
+latency metadata per pipeline stage.
+
+Streaming synthesis (SSE) is available at `POST /v1/query/stream` when
+`ENABLE_STREAMING_QUERY=true`.
 
 ## Configuration
 
@@ -119,10 +145,19 @@ LLM_SYNTHESIS_PROVIDER=
 EMBEDDING_PROVIDER=hash
 EMBEDDING_DIMENSION=8
 
+VECTOR_STORE_PROVIDER=faiss
+CHROMA_HOST=localhost
+CHROMA_PORT=8000
+CHROMA_COLLECTION=rag_template
+
 ENABLE_LLM_NOISE_FILTER=false
 ENABLE_LLM_RERANKER=false
 ENABLE_LLAMAPARSE=true
 ENABLE_BENCHMARK_JUDGE=false
+ENABLE_INDEX_ADMIN=false
+ENABLE_QUERY_TRACING=false
+ENABLE_STREAMING_QUERY=false
+ENABLE_HYBRID_SEARCH=false
 
 INDEX_DIR=.index
 MAX_UPLOAD_MB=5
@@ -132,10 +167,18 @@ API_KEY=
 FAISS vectors are persisted under `INDEX_DIR` as `vectors.faiss` (with companion
 `vectors.records.json` metadata) so indexed content survives service restarts.
 
-Provider IDs currently registered:
+### Provider matrix
 
-- LLM: `echo`, `ollama`, `openai_compatible`, `anthropic`
-- Embeddings: `hash`, `ollama`, `openai_compatible`
+| Provider ID | Type | Required env | Typical `EMBEDDING_DIMENSION` |
+|-------------|------|--------------|--------------------------------|
+| `echo` | LLM | none | n/a |
+| `ollama` | LLM / embeddings | `OLLAMA_BASE_URL` | 768 (`nomic-embed-text`) |
+| `openai_compatible` | LLM / embeddings | `OPENAI_API_KEY`, `OPENAI_BASE_URL` | 1536 (`text-embedding-3-small`) |
+| `anthropic` | LLM | `ANTHROPIC_API_KEY` | n/a |
+| `hash` | embeddings | none | 8 (demo default) |
+| `faiss` | vector store | `INDEX_DIR` | matches embedding dim |
+| `chroma` | vector store | `CHROMA_HOST`, `CHROMA_PORT` | matches embedding dim |
+| `memory` | vector store | none | in-memory only |
 
 When `API_KEY` is set, requests must include:
 
@@ -178,6 +221,21 @@ EMBEDDING_PROVIDER=hash
 EMBEDDING_DIMENSION=8
 ```
 
+ChromaDB vector store:
+
+```bash
+VECTOR_STORE_PROVIDER=chroma
+CHROMA_HOST=localhost
+CHROMA_PORT=8001
+```
+
+Hybrid BM25 + vector retrieval:
+
+```bash
+ENABLE_HYBRID_SEARCH=true
+uv sync --python 3.11 --extra dev --extra hybrid
+```
+
 ## PDF Indexing
 
 `POST /v1/index/pdf` is enabled by default through `ENABLE_LLAMAPARSE=true`.
@@ -195,6 +253,13 @@ curl -X POST http://127.0.0.1:8000/v1/index/pdf \
   -F "file=@manual.pdf;type=application/pdf"
 ```
 
+## Index administration
+
+When `ENABLE_INDEX_ADMIN=true`:
+
+- `GET /v1/index` lists indexed documents with section/chunk counts
+- `DELETE /v1/index/{doc_id}` removes vectors and sections for a document
+
 ## Infrastructure Integrations
 
 The template is built around application ports, so infrastructure can be replaced without changing
@@ -202,38 +267,15 @@ the domain or use cases.
 
 ### ChromaDB
 
-The repository includes `core.infrastructure.persistence.chroma_vector_store.ChromaVectorStore` as
-an example infrastructure adapter. It implements `VectorStorePort`, stores Proxy-Pointer metadata in
-Chroma, deletes vectors by `doc_id` during reindexing, and maps Chroma query results back to
-`SearchHit`.
-
 Install the optional dependency:
 
 ```bash
 uv sync --python 3.11 --extra dev --extra chroma
 ```
 
-Adapter shape:
-
-```python
-from core.infrastructure.persistence.chroma_vector_store import ChromaVectorStore
-
-vector_store = ChromaVectorStore(
-    host="localhost",
-    port=8000,
-    collection_name="rag_template",
-)
-```
-
-To use ChromaDB as the active backend, wire `ChromaVectorStore` into your application/container
-setup directly. The example above shows the constructor shape, but this repository does not expose
-dedicated `VECTOR_STORE_PROVIDER`, `CHROMA_HOST`, `CHROMA_PORT`, or `CHROMA_COLLECTION`
-settings for switching backends via environment variables.
+Set `VECTOR_STORE_PROVIDER=chroma` and point `CHROMA_HOST` / `CHROMA_PORT` at your Chroma instance.
 
 ### AI Agents via MCP
-
-The repository includes `core.mcp_server`, a FastMCP implementation that exposes the RAG API as
-agent tools.
 
 Install the optional dependency:
 
@@ -249,71 +291,73 @@ uv run --python 3.11 --extra mcp python -m core.mcp_server \
   --transport stdio
 ```
 
-Run over HTTP:
-
-```bash
-uv run --python 3.11 --extra mcp python -m core.mcp_server \
-  --base-url http://127.0.0.1:8000 \
-  --transport streamable-http
-```
-
-If the FastAPI service uses `API_KEY`, pass it to the MCP server:
-
-```bash
-uv run --python 3.11 --extra mcp python -m core.mcp_server \
-  --base-url http://127.0.0.1:8000 \
-  --api-key your-key \
-  --transport stdio
-```
+The MCP server verifies API health on startup unless `--skip-health-check` is passed.
 
 Tools exposed:
 
 - `rag_health`: checks `GET /v1/health`.
 - `rag_index_markdown`: indexes Markdown through `POST /v1/index/markdown`.
-- `rag_index_pdf`: indexes base64-encoded PDF bytes through `POST /v1/index/pdf`
-  (returns 404 when `ENABLE_LLAMAPARSE=false`).
+- `rag_index_pdf`: indexes base64-encoded PDF bytes through `POST /v1/index/pdf`.
 - `rag_query`: queries `POST /v1/query` and returns answer plus traceable sources.
-
-This keeps agent permissions narrow: agents can index and query through explicit tools, while vector
-database credentials and provider API keys stay server-side.
+- `rag_delete_index`: deletes a document when `ENABLE_INDEX_ADMIN=true`.
 
 ## Benchmarks
 
-The benchmark module compares model profiles against the same query pipeline and can write JSON and
-CSV artifacts.
-
-Minimal Python usage:
-
-```python
-from pathlib import Path
-
-from core.application.benchmarking.models import BenchmarkQuestion, ModelProfile
-from core.application.benchmarking.runner import BenchmarkRunner
-
-# Provide a QueryUseCase instance wired with the providers you want to compare.
-runner = BenchmarkRunner(query_use_case_factory=lambda profile: query_use_case)
-result = runner.run(
-    profiles=[
-        ModelProfile(
-            name="local-default",
-            llm_routing_provider="echo",
-            llm_synthesis_provider="echo",
-            embedding_provider="hash",
-        )
-    ],
-    questions=[BenchmarkQuestion(id="q1", question="How do I install it?")],
-    k_recall=10,
-    k_candidates=5,
-    k_final=1,
-)
-runner.write_artifacts(result=result, output_dir=Path("benchmarks/out"))
-```
-
-## Test and Format
+Seed fixture documents and run the model matrix:
 
 ```bash
-uv run --python 3.11 --extra dev pytest
-uv run --python 3.11 --extra dev ruff check .
-uv run --python 3.11 --extra dev ruff format --check .
-uv run --python 3.11 --extra dev lint-imports
+python benchmarks/seed_index.py
+python benchmarks/run_matrix.py --live --index-dir benchmarks/.benchmark-index
+python benchmarks/run_matrix.py --mock
 ```
+
+Set `ENABLE_BENCHMARK_JUDGE=true` to score answers with the routing LLM during benchmark runs.
+
+Artifacts are written to `benchmarks/out/` as JSON and CSV.
+
+## Test, format and local CI
+
+### pre-commit (anbefalt)
+
+Installer hooks én gang:
+
+```bash
+uv sync --python 3.11 --extra dev --extra faiss
+uv run pre-commit install
+uv run pre-commit install --hook-type pre-push
+```
+
+Ved **commit** kjøres ruff (lint + format) og import-linter. Ved **push** kjøres i tillegg pytest og mock-benchmark.
+
+Kjør alle sjekker manuelt:
+
+```bash
+uv run pre-commit run --all-files
+uv run pre-commit run --all-files --hook-stage pre-push
+```
+
+Konfigurasjon: [`.pre-commit-config.yaml`](.pre-commit-config.yaml)
+
+### Full CI-script
+
+Samme sjekker som pre-commit, samlet i ett script:
+
+```bash
+bash scripts/ci.sh
+```
+
+On Windows:
+
+```powershell
+./scripts/ci.ps1
+```
+
+Live provider tests (optional, not in pre-commit):
+
+```bash
+RUN_LIVE_MODELS=1 uv run --python 3.11 --extra dev pytest -m live_models
+```
+
+## CI on GitHub
+
+A reference workflow lives in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). It is not required if Actions is unavailable in your GitHub org — use pre-commit or `scripts/ci.sh` locally instead.

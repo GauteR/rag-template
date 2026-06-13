@@ -1,20 +1,23 @@
 # Benchmark questions
 #
 # Each entry defines a question that will be posed to every model profile.
-# The optional `expected_node_ids` list enables retrieval-hit metrics
-# (hit@k_final) when the answer is known to come from specific nodes.
+# Questions are tuned for the hash embedder used in default CI/live runs.
+#
+# Seed fixtures first:
+#   python benchmarks/seed_index.py
 
 questions:
   - id: q1
-    question: How do I install the template?
+    question: Install the template with uv sync
     expected_node_ids:
-      - docs:install:n1
+      - install:n1
 
   - id: q2
-    question: What vector stores are supported?
+    question: FAISS persists vectors under INDEX_DIR
     expected_node_ids:
-      - docs:vectorstores:n1
+      - vectorstores:n2
 
   - id: q3
-    question: How does the query pipeline work?
-    expected_node_ids: []
+    question: Stage 1 broad vector recall retrieves candidate nodes
+    expected_node_ids:
+      - query_pipeline:n2

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Protocol
 
 from core.domain.models import Section
@@ -20,3 +21,6 @@ class LlmPort(Protocol):
 
     def synthesize(self, *, question: str, sections: list[Section]) -> str:
         """Return a grounded answer using the provided full sections."""
+
+    def synthesize_stream(self, *, question: str, sections: list[Section]) -> Iterator[str]:
+        """Stream synthesis tokens or chunks for the provided sections."""

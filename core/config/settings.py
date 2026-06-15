@@ -28,9 +28,11 @@ class Settings(BaseSettings):
     enable_query_tracing: bool = False
     enable_streaming_query: bool = False
     enable_hybrid_search: bool = False
+    enable_public_health: bool = True
 
     index_dir: Path = Field(default=Path(".index"))
     max_upload_mb: int = 5
+    max_query_chars: int = 4000
     api_key: str | None = None
 
     ollama_base_url: str = "http://localhost:11434"

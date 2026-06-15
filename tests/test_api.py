@@ -205,14 +205,78 @@ def test_query_remains_consistent_after_container_restart(tmp_path) -> None:
 
 
 def test_api_key_header_is_required_when_configured(tmp_path) -> None:
-    container = AppContainer(settings=Settings(api_key="secret", index_dir=tmp_path))
+    container = AppContainer(
+        settings=Settings(api_key="secret", index_dir=tmp_path, enable_public_health=False)
+    )
     client = TestClient(create_app(container=container))
 
     unauthorized = client.get("/v1/health")
     authorized = client.get("/v1/health", headers={"X-API-Key": "secret"})
+    wrong_key = client.get("/v1/health", headers={"X-API-Key": "wrong"})
 
     assert unauthorized.status_code == 401
+    assert wrong_key.status_code == 401
     assert authorized.status_code == 200
+
+
+def test_health_is_public_when_enabled_with_api_key_configured(tmp_path) -> None:
+    container = AppContainer(
+        settings=Settings(api_key="secret", index_dir=tmp_path, enable_public_health=True)
+    )
+    client = TestClient(create_app(container=container))
+
+    response = client.get("/v1/health")
+
+    assert response.status_code == 200
+
+
+def test_index_markdown_rejects_invalid_doc_id(tmp_path) -> None:
+    container = AppContainer(settings=Settings(index_dir=tmp_path))
+    client = TestClient(create_app(container=container))
+
+    response = client.post(
+        "/v1/index/markdown",
+        json={"doc_id": "../escape", "markdown": "# Hello"},
+    )
+
+    assert response.status_code == 422
+
+
+def test_query_rejects_oversized_question(tmp_path) -> None:
+    container = AppContainer(settings=Settings(index_dir=tmp_path, max_query_chars=10))
+    client = TestClient(create_app(container=container))
+
+    response = client.post(
+        "/v1/query",
+        json={"question": "x" * 11, "k_recall": 10, "k_candidates": 5, "k_final": 1},
+    )
+
+    assert response.status_code == 422
+
+
+def test_index_markdown_returns_413_when_payload_too_large(tmp_path) -> None:
+    container = AppContainer(settings=Settings(index_dir=tmp_path, max_upload_mb=1))
+    client = TestClient(create_app(container=container))
+
+    response = client.post(
+        "/v1/index/markdown",
+        json={"doc_id": "large", "markdown": "x" * (1024 * 1024 + 1)},
+    )
+
+    assert response.status_code == 413
+
+
+def test_index_pdf_rejects_non_pdf_magic_bytes(tmp_path) -> None:
+    container = AppContainer(settings=Settings(index_dir=tmp_path))
+    client = TestClient(create_app(container=container))
+
+    response = client.post(
+        "/v1/index/pdf",
+        data={"doc_id": "manual-pdf"},
+        files={"file": ("manual.pdf", b"not-a-valid-pdf", "application/pdf")},
+    )
+
+    assert response.status_code == 400
 
 
 def test_index_pdf_is_enabled_by_default(tmp_path) -> None:
@@ -264,7 +328,7 @@ def test_index_pdf_returns_422_for_invalid_pdf_payload(tmp_path) -> None:
     response = client.post(
         "/v1/index/pdf",
         data={"doc_id": "manual-pdf"},
-        files={"file": ("manual.pdf", b"not-a-valid-pdf", "application/pdf")},
+        files={"file": ("manual.pdf", b"%PDF-1.4\n%not-valid-content", "application/pdf")},
     )
 
     assert response.status_code == 422

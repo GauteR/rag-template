@@ -206,7 +206,7 @@ def index_markdown(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail="Markdown payload exceeds MAX_UPLOAD_MB",
         )
-    result = container.index_markdown_use_case().execute(
+    result = container.index_markdown_use_case.execute(
         doc_id=request.doc_id,
         markdown=request.markdown,
     )
@@ -264,7 +264,7 @@ def query_stream(
         max_chars=container.settings.max_query_chars,
     )
 
-    sources, token_stream = container.query_use_case().synthesize_stream(
+    sources, token_stream = container.query_use_case.synthesize_stream(
         question=request.question,
         k_recall=request.k_recall,
         k_candidates=request.k_candidates,
@@ -342,7 +342,7 @@ async def index_pdf(
             detail=str(exc),
         ) from exc
 
-    result = container.index_markdown_use_case().execute(
+    result = container.index_markdown_use_case.execute(
         doc_id=resolved_doc_id,
         markdown=markdown,
     )

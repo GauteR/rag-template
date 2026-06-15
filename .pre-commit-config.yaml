@@ -23,7 +23,7 @@ repos:
 
       - id: pytest
         name: pytest (not live_models)
-        entry: uv run --extra dev --extra faiss pytest -m "not live_models"
+        entry: uv run --extra dev --extra faiss --extra chroma pytest -m "not live_models"
         language: system
         pass_filenames: false
         always_run: true

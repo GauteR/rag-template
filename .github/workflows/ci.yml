@@ -1,5 +1,5 @@
 # Reference workflow for GitHub Actions.
-# Prefer pre-commit locally when Actions is unavailable:
+# Tests and benchmark mock run via pre-commit pre-push hooks locally:
 #   uv run pre-commit install && uv run pre-commit install --hook-type pre-push
 #   bash scripts/ci.sh
 
@@ -12,7 +12,7 @@ on:
     branches: [main]
 
 jobs:
-  test:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,12 +26,7 @@ jobs:
         run: uv python install 3.11
 
       - name: Install dependencies
-        run: uv sync --python 3.11 --extra dev --extra faiss --extra chroma
-
-      - name: Pre-commit
-        run: |
-          uv run pre-commit run --all-files
-          uv run pre-commit run --all-files --hook-stage pre-push
+        run: uv sync --python 3.11 --extra dev
 
       - name: Ruff check
         run: uv run --python 3.11 --extra dev ruff check .
@@ -41,9 +36,3 @@ jobs:
 
       - name: Import linter
         run: uv run --python 3.11 --extra dev lint-imports
-
-      - name: Pytest
-        run: uv run --python 3.11 --extra dev --extra faiss --extra chroma pytest -m "not live_models" --cov-fail-under=70
-
-      - name: Benchmark mock CLI
-        run: uv run --python 3.11 --extra dev python benchmarks/run_matrix.py --mock

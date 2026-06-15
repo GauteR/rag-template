@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     embedding_dimension: int = 8
 
     vector_store_provider: str = "faiss"
+    section_store_provider: str = "json"
     chroma_host: str = "localhost"
     chroma_port: int = 8000
     chroma_collection: str = "rag_template"
@@ -23,6 +24,7 @@ class Settings(BaseSettings):
     enable_llm_noise_filter: bool = False
     enable_llm_reranker: bool = False
     enable_llamaparse: bool = True
+    enable_pdf_indexing: bool = True
     enable_benchmark_judge: bool = False
     enable_index_admin: bool = False
     enable_query_tracing: bool = False
@@ -64,6 +66,7 @@ class Settings(BaseSettings):
         llm_provider_ids: set[str],
         embedding_provider_ids: set[str],
         vector_store_provider_ids: set[str] | None = None,
+        section_store_provider_ids: set[str] | None = None,
     ) -> None:
         for provider in {self.routing_provider, self.synthesis_provider}:
             if provider not in llm_provider_ids:
@@ -73,6 +76,9 @@ class Settings(BaseSettings):
         if vector_store_provider_ids is not None:
             if self.vector_store_provider not in vector_store_provider_ids:
                 raise ValueError(f"Unknown vector store provider: {self.vector_store_provider}")
+        if section_store_provider_ids is not None:
+            if self.section_store_provider not in section_store_provider_ids:
+                raise ValueError(f"Unknown section store provider: {self.section_store_provider}")
 
     def validate_provider_configuration(self) -> None:
         if self.embedding_dimension < 1:

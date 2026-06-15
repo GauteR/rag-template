@@ -289,10 +289,10 @@ async def index_pdf(
     doc_id: Annotated[str | None, Form()] = None,
     container: AppContainer = ContainerDependency,
 ) -> IndexMarkdownResponse:
-    if not container.settings.enable_llamaparse:
+    if not container.settings.enable_pdf_indexing:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="PDF indexing is disabled. Set ENABLE_LLAMAPARSE=true to enable it.",
+            detail="PDF indexing is disabled. Set ENABLE_PDF_INDEXING=true to enable it.",
         )
 
     filename = file.filename or "document.pdf"

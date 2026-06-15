@@ -14,7 +14,7 @@ from core.config.settings import Settings
 def seed_index(*, index_dir: Path, fixtures_dir: Path) -> dict[str, list[str]]:
     container = AppContainer(settings=Settings(index_dir=index_dir))
     parser = MarkdownSkeletonParser()
-    use_case = container.index_markdown_use_case()
+    use_case = container.index_markdown_use_case
     node_ids_by_doc: dict[str, list[str]] = {}
 
     for markdown_path in sorted(fixtures_dir.glob("*.md")):

@@ -11,13 +11,13 @@ def test_hybrid_search_combines_vector_and_lexical(tmp_path) -> None:
 
     settings = Settings(index_dir=tmp_path, enable_hybrid_search=True)
     container = AppContainer(settings=settings)
-    use_case = container.index_markdown_use_case()
+    use_case = container.index_markdown_use_case
     use_case.execute(
         doc_id="manual",
         markdown="# Intro\nWelcome\n\n## Install\nInstall with uv sync",
     )
 
-    response = container.query_use_case().execute(
+    response = container.query_use_case.execute(
         question="install uv sync",
         k_recall=10,
         k_candidates=5,

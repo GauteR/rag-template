@@ -9,6 +9,9 @@ class VectorStorePort(Protocol):
     def add(self, records: list[VectorRecord]) -> None:
         """Add embedded chunks to the vector index."""
 
+    def replace_document(self, doc_id: str, records: list[VectorRecord]) -> None:
+        """Atomically replace all vectors for a document."""
+
     def delete_document(self, doc_id: str) -> None:
         """Remove all vectors for a document before replacement indexing."""
 

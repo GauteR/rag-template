@@ -62,6 +62,42 @@ class FaissVectorStore(VectorStorePort):
         self._records.extend(normalized_records)
         self._save()
 
+    def replace_document(self, doc_id: str, records: list[VectorRecord]) -> None:
+        for record in records:
+            if len(record.embedding) != self._dimension:
+                raise ValueError(
+                    "Embedding dimension mismatch: "
+                    f"expected {self._dimension}, got {len(record.embedding)}"
+                )
+        normalized_records = [
+            VectorRecord(
+                doc_id=record.doc_id,
+                node_id=record.node_id,
+                chunk_id=record.chunk_id,
+                embedding=normalize_vector(record.embedding),
+                text=record.text,
+                breadcrumb=record.breadcrumb,
+            )
+            for record in records
+        ]
+        original_records = list(self._records)
+        original_index = self._index
+        original_fallback_records = list(self._fallback._records)
+        try:
+            self._records = [record for record in self._records if record.doc_id != doc_id]
+            self._records.extend(normalized_records)
+            if self._index is None:
+                self._fallback.delete_document(doc_id)
+                self._fallback.add(normalized_records)
+            else:
+                self._rebuild_index()
+            self._save()
+        except Exception:
+            self._records = original_records
+            self._index = original_index
+            self._fallback._records = original_fallback_records
+            raise
+
     def delete_document(self, doc_id: str) -> None:
         if self._index is None:
             self._records = [record for record in self._records if record.doc_id != doc_id]

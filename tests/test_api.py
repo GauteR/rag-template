@@ -308,8 +308,8 @@ def test_index_pdf_uses_filename_as_default_doc_id(tmp_path) -> None:
     assert response.json()["doc_id"] == "guide"
 
 
-def test_index_pdf_returns_404_when_llamaparse_disabled(tmp_path) -> None:
-    container = AppContainer(settings=Settings(index_dir=tmp_path, enable_llamaparse=False))
+def test_index_pdf_returns_404_when_pdf_indexing_disabled(tmp_path) -> None:
+    container = AppContainer(settings=Settings(index_dir=tmp_path, enable_pdf_indexing=False))
     client = TestClient(create_app(container=container))
 
     response = client.post(
@@ -319,6 +319,21 @@ def test_index_pdf_returns_404_when_llamaparse_disabled(tmp_path) -> None:
     )
 
     assert response.status_code == 404
+
+
+def test_index_pdf_works_when_llamaparse_disabled(tmp_path) -> None:
+    container = AppContainer(
+        settings=Settings(index_dir=tmp_path, enable_llamaparse=False, enable_pdf_indexing=True)
+    )
+    client = TestClient(create_app(container=container))
+
+    response = client.post(
+        "/v1/index/pdf",
+        data={"doc_id": "manual-pdf"},
+        files={"file": ("manual.pdf", _pdf_bytes(), "application/pdf")},
+    )
+
+    assert response.status_code == 200
 
 
 def test_index_pdf_returns_422_for_invalid_pdf_payload(tmp_path) -> None:

@@ -9,14 +9,14 @@ from core.application.indexing.markdown_parser import MarkdownSkeletonParser
 from core.application.indexing.noise_filter import HeuristicNoiseFilter, LlmNoiseFilter, NoiseFilter
 from core.application.indexing.use_case import IndexMarkdownUseCase
 from core.application.ports.lexical_store import LexicalStorePort
+from core.application.ports.section_source import SectionSourcePort
 from core.application.ports.vector_store import VectorStorePort
 from core.application.query.use_case import QueryUseCase
 from core.config.settings import Settings
 from core.infrastructure.embeddings.registry import embedding_registry
 from core.infrastructure.extraction.llamaparse_pdf_extractor import LlamaParsePdfExtractor
 from core.infrastructure.llm.registry import llm_registry
-from core.infrastructure.persistence.json_section_store import JsonSectionStore
-from core.infrastructure.persistence.registry import vector_store_registry
+from core.infrastructure.persistence.registry import section_store_registry, vector_store_registry
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +47,7 @@ class AppContainer:
                 llm_provider_ids=llm_registry.provider_ids(),
                 embedding_provider_ids=embedding_registry.provider_ids(),
                 vector_store_provider_ids=vector_store_registry.provider_ids(),
+                section_store_provider_ids=section_store_registry.provider_ids(),
             )
         except ValueError as exc:
             errors.append(str(exc))
@@ -87,8 +88,8 @@ class AppContainer:
         return vector_store_registry.build(self.settings.vector_store_provider, self.settings)
 
     @cached_property
-    def section_store(self) -> JsonSectionStore:
-        return JsonSectionStore(path=self.settings.index_dir / "sections.json")
+    def section_store(self) -> SectionSourcePort:
+        return section_store_registry.build(self.settings.section_store_provider, self.settings)
 
     @cached_property
     def pdf_extractor(self) -> LlamaParsePdfExtractor:

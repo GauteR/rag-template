@@ -89,7 +89,7 @@ def _make_live_factory(*, index_dir: Path):
                 }
             )
         )
-        return container.query_use_case()
+        return container.query_use_case
 
     return factory
 

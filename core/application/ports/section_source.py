@@ -9,6 +9,9 @@ class SectionSourcePort(Protocol):
     def store_document(self, document: Document) -> None:
         """Persist all node sections for later pointer fetch."""
 
+    def replace_document(self, document: Document) -> None:
+        """Atomically replace all sections for a document."""
+
     def delete_document(self, doc_id: str) -> None:
         """Remove persisted sections for a document before replacement indexing."""
 

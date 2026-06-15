@@ -2,13 +2,17 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from core.application.ports.section_source import SectionSourcePort
 from core.application.ports.vector_store import VectorStorePort
 from core.config.settings import Settings
 from core.infrastructure.persistence.chroma_vector_store import ChromaVectorStore
 from core.infrastructure.persistence.faiss_vector_store import FaissVectorStore
+from core.infrastructure.persistence.in_memory_section_store import InMemorySectionStore
 from core.infrastructure.persistence.in_memory_vector_store import InMemoryVectorStore
+from core.infrastructure.persistence.json_section_store import JsonSectionStore
 
 VectorStoreFactory = Callable[[Settings], VectorStorePort]
+SectionStoreFactory = Callable[[Settings], SectionSourcePort]
 
 
 class VectorStoreRegistry:
@@ -48,3 +52,28 @@ vector_store_registry.register(
         collection_name=settings.chroma_collection,
     ),
 )
+
+
+class SectionStoreRegistry:
+    def __init__(self) -> None:
+        self._factories: dict[str, SectionStoreFactory] = {}
+
+    def register(self, provider_id: str, factory: SectionStoreFactory) -> None:
+        self._factories[provider_id] = factory
+
+    def provider_ids(self) -> set[str]:
+        return set(self._factories)
+
+    def build(self, provider_id: str, settings: Settings) -> SectionSourcePort:
+        try:
+            return self._factories[provider_id](settings)
+        except KeyError as exc:
+            raise ValueError(f"Unknown section store provider: {provider_id}") from exc
+
+
+section_store_registry = SectionStoreRegistry()
+section_store_registry.register(
+    "json",
+    lambda settings: JsonSectionStore(path=settings.index_dir / "sections.json"),
+)
+section_store_registry.register("memory", lambda _settings: InMemorySectionStore())

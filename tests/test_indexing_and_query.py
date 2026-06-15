@@ -7,7 +7,8 @@ from core.application.indexing.use_case import IndexMarkdownUseCase
 from core.application.ports.embeddings import EmbedderPort
 from core.application.ports.llm import LlmPort
 from core.application.query.use_case import QueryUseCase
-from core.domain.models import Section
+from core.domain.models import Section, VectorRecord
+from core.infrastructure.persistence.faiss_vector_store import FaissVectorStore
 from core.infrastructure.persistence.in_memory_section_store import (
     InMemorySectionStore,
 )

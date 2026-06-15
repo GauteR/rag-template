@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
+import re
+import secrets
 from pathlib import Path
 from typing import Annotated
 
@@ -16,9 +18,13 @@ from fastapi import (
     UploadFile,
     status,
 )
+from fastapi import (
+    Path as PathParam,
+)
 from fastapi.responses import StreamingResponse
 
 from app.api.schemas import (
+    DOC_ID_PATTERN,
     DeleteIndexResponse,
     HealthResponse,
     IndexDocumentSummary,
@@ -37,12 +43,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1")
 
 
+def get_container(request: Request) -> AppContainer:
+    return request.app.state.container
+
+
 def get_authorized_container(
     request: Request,
     x_api_key: str | None = Header(default=None),
 ) -> AppContainer:
-    container: AppContainer = request.app.state.container
-    if container.settings.api_key and x_api_key != container.settings.api_key:
+    container = get_container(request)
+    if container.settings.api_key and (
+        x_api_key is None or not secrets.compare_digest(x_api_key, container.settings.api_key)
+    ):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or missing X-API-Key",
@@ -53,12 +65,45 @@ def get_authorized_container(
 ContainerDependency = Depends(get_authorized_container)
 
 
+def _validate_doc_id(doc_id: str) -> str:
+    if not re.fullmatch(DOC_ID_PATTERN, doc_id):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="doc_id contains invalid characters",
+        )
+    return doc_id
+
+
+def _validate_question_length(*, question: str, max_chars: int) -> None:
+    if len(question) > max_chars:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"question exceeds maximum length of {max_chars} characters",
+        )
+
+
 def _require_index_admin(container: AppContainer) -> None:
     if not container.settings.enable_index_admin:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Index admin is disabled. Set ENABLE_INDEX_ADMIN=true to enable it.",
         )
+
+
+def _to_query_source_responses(sources) -> list[QuerySourceResponse]:
+    return [
+        QuerySourceResponse(
+            doc_id=source.doc_id,
+            node_id=source.node_id,
+            breadcrumb=list(source.breadcrumb),
+            score=source.score,
+            text=source.text,
+            citation=source.citation,
+            start_offset=source.start_offset,
+            end_offset=source.end_offset,
+        )
+        for source in sources
+    ]
 
 
 def _to_query_response(result) -> QueryResponseModel:
@@ -76,25 +121,23 @@ def _to_query_response(result) -> QueryResponseModel:
         )
     return QueryResponseModel(
         answer=result.answer,
-        sources=[
-            QuerySourceResponse(
-                doc_id=source.doc_id,
-                node_id=source.node_id,
-                breadcrumb=list(source.breadcrumb),
-                score=source.score,
-                text=source.text,
-                citation=source.citation,
-                start_offset=source.start_offset,
-                end_offset=source.end_offset,
-            )
-            for source in result.sources
-        ],
+        sources=_to_query_source_responses(result.sources),
         metadata=metadata,
     )
 
 
 @router.get("/health", response_model=HealthResponse)
-def health(container: AppContainer = ContainerDependency) -> HealthResponse:
+def health(
+    request: Request,
+    x_api_key: str | None = Header(default=None),
+) -> HealthResponse:
+    container = get_container(request)
+    if container.settings.api_key and not container.settings.enable_public_health:
+        if x_api_key is None or not secrets.compare_digest(x_api_key, container.settings.api_key):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or missing X-API-Key",
+            )
     config_errors = container.collect_config_errors()
     index_document_count = 0
     index_consistent = False
@@ -143,7 +186,10 @@ def list_index(container: AppContainer = ContainerDependency) -> IndexListRespon
 
 
 @router.delete("/index/{doc_id}", response_model=DeleteIndexResponse)
-def delete_index(doc_id: str, container: AppContainer = ContainerDependency) -> DeleteIndexResponse:
+def delete_index(
+    doc_id: Annotated[str, PathParam(pattern=DOC_ID_PATTERN)],
+    container: AppContainer = ContainerDependency,
+) -> DeleteIndexResponse:
     _require_index_admin(container)
     existed = container.delete_document(doc_id)
     return DeleteIndexResponse(doc_id=doc_id, deleted=existed)
@@ -160,7 +206,7 @@ def index_markdown(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail="Markdown payload exceeds MAX_UPLOAD_MB",
         )
-    result = container.index_markdown_use_case().execute(
+    result = container.index_markdown_use_case.execute(
         doc_id=request.doc_id,
         markdown=request.markdown,
     )
@@ -176,6 +222,10 @@ def query(
     request: QueryRequest,
     container: AppContainer = ContainerDependency,
 ) -> QueryResponseModel:
+    _validate_question_length(
+        question=request.question,
+        max_chars=container.settings.max_query_chars,
+    )
     result = container.query_use_case().execute(
         question=request.question,
         k_recall=request.k_recall,
@@ -209,8 +259,12 @@ def query_stream(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Streaming query is disabled. Set ENABLE_STREAMING_QUERY=true to enable it.",
         )
+    _validate_question_length(
+        question=request.question,
+        max_chars=container.settings.max_query_chars,
+    )
 
-    sources, token_stream = container.query_use_case().synthesize_stream(
+    sources, token_stream = container.query_use_case.synthesize_stream(
         question=request.question,
         k_recall=request.k_recall,
         k_candidates=request.k_candidates,
@@ -220,19 +274,7 @@ def query_stream(
     )
 
     def event_generator():
-        sources_payload = [
-            QuerySourceResponse(
-                doc_id=source.doc_id,
-                node_id=source.node_id,
-                breadcrumb=list(source.breadcrumb),
-                score=source.score,
-                text=source.text,
-                citation=source.citation,
-                start_offset=source.start_offset,
-                end_offset=source.end_offset,
-            ).model_dump()
-            for source in sources
-        ]
+        sources_payload = [source.model_dump() for source in _to_query_source_responses(sources)]
         yield f"event: sources\ndata: {json.dumps({'sources': sources_payload})}\n\n"
         for token in token_stream:
             yield f"event: token\ndata: {json.dumps({'token': token})}\n\n"
@@ -247,14 +289,14 @@ async def index_pdf(
     doc_id: Annotated[str | None, Form()] = None,
     container: AppContainer = ContainerDependency,
 ) -> IndexMarkdownResponse:
-    if not container.settings.enable_llamaparse:
+    if not container.settings.enable_pdf_indexing:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="PDF indexing is disabled. Set ENABLE_LLAMAPARSE=true to enable it.",
+            detail="PDF indexing is disabled. Set ENABLE_PDF_INDEXING=true to enable it.",
         )
 
     filename = file.filename or "document.pdf"
-    resolved_doc_id = (doc_id or Path(filename).stem).strip()
+    resolved_doc_id = _validate_doc_id((doc_id or Path(filename).stem).strip())
     if not resolved_doc_id:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -286,6 +328,12 @@ async def index_pdf(
 
     content = bytes(content_buffer)
 
+    if not content.startswith(b"%PDF-"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid PDF file: missing %PDF- header",
+        )
+
     try:
         markdown = container.pdf_extractor.extract_markdown(filename=filename, content=content)
     except ValueError as exc:
@@ -294,7 +342,7 @@ async def index_pdf(
             detail=str(exc),
         ) from exc
 
-    result = container.index_markdown_use_case().execute(
+    result = container.index_markdown_use_case.execute(
         doc_id=resolved_doc_id,
         markdown=markdown,
     )

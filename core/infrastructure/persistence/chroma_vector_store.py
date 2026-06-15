@@ -39,6 +39,10 @@ class ChromaVectorStore(VectorStorePort):
             ],
         )
 
+    def replace_document(self, doc_id: str, records: list[VectorRecord]) -> None:
+        self.delete_document(doc_id)
+        self.add(records)
+
     def delete_document(self, doc_id: str) -> None:
         self._collection.delete(where={"doc_id": doc_id})
 
@@ -131,7 +135,7 @@ class ChromaVectorStore(VectorStorePort):
                             else ()
                         ),
                     ),
-                    score=1.0 - float(distance),
+                    score=max(0.0, min(1.0, 1.0 - float(distance))),
                 )
             )
         return hits

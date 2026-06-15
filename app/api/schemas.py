@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+DOC_ID_PATTERN = r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"
+
 
 class IndexMarkdownRequest(BaseModel):
-    doc_id: str = Field(min_length=1)
+    doc_id: str = Field(min_length=1, max_length=128, pattern=DOC_ID_PATTERN)
     markdown: str = Field(min_length=1)
 
 
@@ -15,11 +17,11 @@ class IndexMarkdownResponse(BaseModel):
 
 
 class QueryRequest(BaseModel):
-    question: str = Field(min_length=1)
+    question: str = Field(min_length=1, max_length=4000)
     k_recall: int = Field(default=200, ge=1, le=1_000)
     k_candidates: int = Field(default=50, ge=1, le=500)
     k_final: int = Field(default=5, ge=1, le=50)
-    doc_id: str | None = None
+    doc_id: str | None = Field(default=None, pattern=DOC_ID_PATTERN)
     min_score: float | None = Field(default=None, ge=0.0)
 
 

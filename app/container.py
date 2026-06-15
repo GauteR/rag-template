@@ -2,27 +2,33 @@ from __future__ import annotations
 
 import logging
 from functools import cached_property
+from time import monotonic
 
 from core.application.indexing.chunking import StructureGuidedChunker
 from core.application.indexing.markdown_parser import MarkdownSkeletonParser
-from core.application.indexing.noise_filter import HeuristicNoiseFilter, LlmNoiseFilter
+from core.application.indexing.noise_filter import HeuristicNoiseFilter, LlmNoiseFilter, NoiseFilter
 from core.application.indexing.use_case import IndexMarkdownUseCase
+from core.application.ports.lexical_store import LexicalStorePort
+from core.application.ports.section_source import SectionSourcePort
 from core.application.ports.vector_store import VectorStorePort
 from core.application.query.use_case import QueryUseCase
 from core.config.settings import Settings
 from core.infrastructure.embeddings.registry import embedding_registry
 from core.infrastructure.extraction.llamaparse_pdf_extractor import LlamaParsePdfExtractor
 from core.infrastructure.llm.registry import llm_registry
-from core.infrastructure.persistence.json_section_store import JsonSectionStore
-from core.infrastructure.persistence.registry import vector_store_registry
+from core.infrastructure.persistence.registry import section_store_registry, vector_store_registry
 
 logger = logging.getLogger(__name__)
+
+_CHROMA_HEALTH_TTL_SECONDS = 30.0
 
 
 class AppContainer:
     def __init__(self, *, settings: Settings | None = None) -> None:
         self.settings = settings or Settings()
         self._embedding_probe_error: str | None = None
+        self._chroma_reachable_cache: bool | None = None
+        self._chroma_health_checked_at: float | None = None
         self._probe_embedding_dimension()
 
     def _probe_embedding_dimension(self) -> None:
@@ -41,6 +47,7 @@ class AppContainer:
                 llm_provider_ids=llm_registry.provider_ids(),
                 embedding_provider_ids=embedding_registry.provider_ids(),
                 vector_store_provider_ids=vector_store_registry.provider_ids(),
+                section_store_provider_ids=section_store_registry.provider_ids(),
             )
         except ValueError as exc:
             errors.append(str(exc))
@@ -50,7 +57,19 @@ class AppContainer:
             errors.append(str(exc))
         if self._embedding_probe_error is not None:
             errors.append(self._embedding_probe_error)
+        if self.settings.enable_hybrid_search:
+            errors.extend(self._hybrid_search_config_errors())
         return errors
+
+    def _hybrid_search_config_errors(self) -> list[str]:
+        import importlib.util
+
+        if importlib.util.find_spec("rank_bm25") is None:
+            return [
+                "ENABLE_HYBRID_SEARCH is true but rank-bm25 is not installed. "
+                "Install with: uv sync --extra hybrid"
+            ]
+        return []
 
     @cached_property
     def embedder(self):
@@ -69,31 +88,28 @@ class AppContainer:
         return vector_store_registry.build(self.settings.vector_store_provider, self.settings)
 
     @cached_property
-    def section_store(self) -> JsonSectionStore:
-        return JsonSectionStore(path=self.settings.index_dir / "sections.json")
+    def section_store(self) -> SectionSourcePort:
+        return section_store_registry.build(self.settings.section_store_provider, self.settings)
 
     @cached_property
     def pdf_extractor(self) -> LlamaParsePdfExtractor:
         return LlamaParsePdfExtractor(api_key=self.settings.llama_cloud_api_key)
 
-    def _lexical_store(self):
+    @cached_property
+    def lexical_store(self) -> LexicalStorePort | None:
         if not self.settings.enable_hybrid_search:
             return None
         from core.infrastructure.persistence.bm25_lexical_store import Bm25LexicalStore
 
         return Bm25LexicalStore(path=self.settings.index_dir / "lexical.json")
 
-    def delete_document(self, doc_id: str) -> bool:
-        vector_doc_ids = self.vector_store.doc_ids()
-        section_doc_ids = self.section_store.doc_ids()
-        existed = doc_id in vector_doc_ids or doc_id in section_doc_ids
-        self.vector_store.delete_document(doc_id)
-        self.section_store.delete_document(doc_id)
-        lexical_store = self._lexical_store()
-        if lexical_store is not None:
-            lexical_store.delete_document(doc_id)
-        return existed
+    @cached_property
+    def noise_filter(self) -> NoiseFilter:
+        if self.settings.enable_llm_noise_filter:
+            return LlmNoiseFilter(llm=self.reranker_llm)
+        return HeuristicNoiseFilter()
 
+    @cached_property
     def index_markdown_use_case(self) -> IndexMarkdownUseCase:
         return IndexMarkdownUseCase(
             parser=MarkdownSkeletonParser(),
@@ -101,15 +117,11 @@ class AppContainer:
             embedder=self.embedder,
             vector_store=self.vector_store,
             section_source=self.section_store,
-            noise_filter=self._noise_filter(),
-            lexical_store=self._lexical_store(),
+            noise_filter=self.noise_filter,
+            lexical_store=self.lexical_store,
         )
 
-    def _noise_filter(self):
-        if self.settings.enable_llm_noise_filter:
-            return LlmNoiseFilter(llm=self.reranker_llm)
-        return HeuristicNoiseFilter()
-
+    @cached_property
     def query_use_case(self) -> QueryUseCase:
         return QueryUseCase(
             embedder=self.embedder,
@@ -120,8 +132,18 @@ class AppContainer:
             enable_llm_reranker=self.settings.enable_llm_reranker,
             enable_query_tracing=self.settings.enable_query_tracing,
             enable_hybrid_search=self.settings.enable_hybrid_search,
-            lexical_store=self._lexical_store(),
+            lexical_store=self.lexical_store,
         )
+
+    def delete_document(self, doc_id: str) -> bool:
+        vector_doc_ids = self.vector_store.doc_ids()
+        section_doc_ids = self.section_store.doc_ids()
+        existed = doc_id in vector_doc_ids or doc_id in section_doc_ids
+        self.vector_store.delete_document(doc_id)
+        self.section_store.delete_document(doc_id)
+        if self.lexical_store is not None:
+            self.lexical_store.delete_document(doc_id)
+        return existed
 
     def faiss_available(self) -> bool:
         from core.infrastructure.persistence.faiss_vector_store import FaissVectorStore
@@ -133,8 +155,17 @@ class AppContainer:
     def chroma_reachable(self) -> bool | None:
         if self.settings.vector_store_provider != "chroma":
             return None
+        now = monotonic()
+        if (
+            self._chroma_health_checked_at is not None
+            and now - self._chroma_health_checked_at < _CHROMA_HEALTH_TTL_SECONDS
+        ):
+            return self._chroma_reachable_cache
         try:
             self.vector_store.count()
-            return True
+            reachable = True
         except Exception:
-            return False
+            reachable = False
+        self._chroma_reachable_cache = reachable
+        self._chroma_health_checked_at = now
+        return reachable

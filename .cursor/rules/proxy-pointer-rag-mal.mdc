@@ -11,53 +11,96 @@ Reference: plan «Generic Proxy-Pointer RAG Template» (FastAPI, modular monolit
 
 - **Clean Architecture:** dependencies point inwards. Presentation → application → domain. Infrastructure implements ports from the application; adapters may use domain types where needed.
 - **Domain** (`core/domain/`): no FastAPI, httpx, FAISS, file paths, or reading from `os.environ`. Only entities, value objects, and domain rules.
-- **Application** (`core/application/`): use cases, `typing.Protocol`/ABC ports (`LlmPort`, `EmbedderPort`, `VectorStorePort`, `SectionSourcePort`, `PdfExtractorPort`). Import only from domain (+ stdlib).
+- **Application** (`core/application/`): use cases, `typing.Protocol`/ABC ports (`LlmPort`, `EmbedderPort`, `VectorStorePort`, `SectionSourcePort`, `LexicalStorePort`, `PdfExtractorPort`). Import only from domain (+ stdlib).
 - **Infrastructure** (`core/infrastructure/`): concrete adapters; config injected via constructor/factory — **no** global env reads in the domain.
-- **Presentation** (`app/`): thin FastAPI routes; one application service per endpoint; Pydantic for HTTP schemas.
-- **Composition root** (`app/container.py` or equivalent): the only place that wires ports to adapters based on `Settings` (pydantic-settings). Routes do not instantiate FAISS/LLM directly.
+- **Presentation** (`app/`): thin FastAPI routes; Pydantic for HTTP schemas. Routes delegate to container/use cases — no direct FAISS/LLM instantiation.
+- **Composition root** (`app/container.py`): the only place that wires ports to adapters based on `Settings` (pydantic-settings).
+
+### Composition root conventions
+
+- Wire stores and providers through **registries** in `core/infrastructure/*/registry.py` and `core/infrastructure/persistence/registry.py`.
+- Use `@cached_property` for heavy dependencies: `embedder`, `vector_store`, `section_store`, `lexical_store`, `noise_filter`, `index_markdown_use_case`, `query_use_case`.
+- Access cached use cases as **properties**: `container.query_use_case`, not `container.query_use_case()`.
+- `collect_config_errors()` validates provider IDs, required keys, embedding probe, hybrid `rank-bm25` availability, and FAISS load status — without exposing secrets.
 
 ## Modules and Naming
 
 - A single deployable **modular monolith**; delimited modules: `indexing`, `query`, `benchmarking` with few cross-imports.
 - **snake_case** for service/app names and package paths in the repo.
 
-## LLM and Embeddings (Extensible)
+## Registries (extensible providers)
 
-- A single **LlmPort** contract; provider chosen via **registry** mapping string `provider-id` to adapter factory. Roles: `LLM_ROUTING_PROVIDER`, `LLM_SYNTHESIS_PROVIDER` (or shared `LLM_PROVIDER` as default).
-- **EmbedderPort** with the same pattern: `EMBEDDING_PROVIDER` + `EMBEDDING_DIMENSION` matching FAISS.
-- New provider: module under `infrastructure/llm/providers/<id>/` (and similarly for embeddings), registration in `registry.py`, env documented in `.env.example`, optional `pyproject` extra, tests with mocked HTTP/SDK.
-- Structured JSON for noise filter/re-rank: the adapter normalizes to unified semantics (native JSON, `response_format`, tools, or robust text parsing) — use cases must not be aware of which API is used.
+| Port | Registry | Provider IDs |
+|------|----------|--------------|
+| LLM | `core/infrastructure/llm/registry.py` | `echo`, `ollama`, `openai_compatible`, `anthropic` |
+| Embeddings | `core/infrastructure/embeddings/registry.py` | `hash`, `ollama`, `openai_compatible` |
+| Vector store | `core/infrastructure/persistence/registry.py` | `faiss`, `memory`, `chroma` |
+| Section store | `core/infrastructure/persistence/registry.py` | `json`, `memory` |
+
+- Env: `*_PROVIDER` string + registration in `registry.py` + `.env.example` + optional `pyproject` extra + mocked adapter tests.
+- New provider modules may live as flat files or under `providers/<id>/`; register in `registry.py` either way.
+- Roles for LLM: `LLM_ROUTING_PROVIDER`, `LLM_SYNTHESIS_PROVIDER` (fallback: `LLM_PROVIDER`).
 
 ## Proxy-Pointer Pipeline (Core)
 
 1. Markdown → **skeleton tree** (`#`…`######`) with `node_id`, level, order.
 2. **Structure-guided chunking** only within section boundaries (not across heading nodes).
 3. **Breadcrumb injection** in embedding text: `path > to > section` + content.
-4. **Noise filter:** with `ENABLE_LLM_NOISE_FILTER` — LLM; without — heuristic/stopword list.
-5. **Query:** Stage1 FAISS (broad recall) → dedupe `(doc_id, node_id)` → Stage2 LLM re-rank on breadcrumbs (or embedding-only ranking when `ENABLE_LLM_RERANKER` is off) → **pointer:** fetch **full section text** for each selected node for synthesis — not just the chunk fragment.
+4. **Noise filter:** with `ENABLE_LLM_NOISE_FILTER` — LLM; without — heuristic title list.
+5. **Query:** vector recall (FAISS/Chroma/memory) → optional hybrid BM25 via **RRF merge** → dedupe `(doc_id, node_id)` → Stage2 LLM re-rank on breadcrumbs (or embedding order when `ENABLE_LLM_RERANKER` is off) → **pointer:** fetch **full section text** for synthesis.
 6. Document without headings: one root node or flat chunking (graceful degradation).
 
-## API (Goals)
+### Indexing atomicity
 
-- `POST /v1/index/markdown`, `POST /v1/query`, `GET /v1/health`.
-- Optional: `POST /v1/index/pdf` behind the LlamaParse flag.
-- Reply with traceability: breadcrumb path, `node_id`, citation/offset where possible.
+- Re-indexing uses `replace_document()` on `VectorStorePort` and `SectionSourcePort` — not delete-then-add.
+- Order in `IndexMarkdownUseCase`: embed first, then `vector_store.replace_document`, then `section_source.replace_document`, then lexical index.
+- Store implementations should roll back in-memory state on persist failure (see `FaissVectorStore`, `JsonSectionStore`).
+
+### Pointer semantics
+
+- Section stores build pointer text as **node content + descendant sections** (subtree rollup) for richer synthesis context.
+- Responses expose breadcrumb, `node_id`, citation, and char offsets where available.
+
+## API
+
+- Core: `GET /v1/health`, `POST /v1/index/markdown`, `POST /v1/query`.
+- Optional: `POST /v1/index/pdf` (`ENABLE_PDF_INDEXING`), `POST /v1/query/stream` (`ENABLE_STREAMING_QUERY`), index admin (`ENABLE_INDEX_ADMIN`).
+- `doc_id` must match `^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$` in request bodies and path params.
+- PDF uploads validated with `%PDF-` magic bytes and `MAX_UPLOAD_MB`.
+- API key via `X-API-Key` with `secrets.compare_digest`. Health may be public when `ENABLE_PUBLIC_HEALTH=true` even if `API_KEY` is set.
 
 ## Configuration and Feature Flags
 
-- New functionality must be toggleable: behind env flags (e.g. `ENABLE_LLM_RERANKER`, `ENABLE_LLAMAPARSE`, `ENABLE_BENCHMARK_JUDGE`).
-- Validation at startup/health: selected provider exists in registry; required keys/base_url for the active adapter.
+New functionality must be toggleable via env (document in `.env.example`):
+
+| Flag | Purpose |
+|------|---------|
+| `ENABLE_LLM_NOISE_FILTER` | LLM noise filter vs heuristic |
+| `ENABLE_LLM_RERANKER` | LLM rerank vs embedding order |
+| `ENABLE_LLAMAPARSE` | LlamaParse API for PDF extraction |
+| `ENABLE_PDF_INDEXING` | `POST /v1/index/pdf` endpoint (pypdf fallback without LlamaParse) |
+| `ENABLE_HYBRID_SEARCH` | BM25 + vector (requires `rank-bm25` / `hybrid` extra) |
+| `ENABLE_INDEX_ADMIN` | List/delete index |
+| `ENABLE_QUERY_TRACING` | Latency metadata in query responses |
+| `ENABLE_STREAMING_QUERY` | SSE streaming synthesis |
+| `ENABLE_BENCHMARK_JUDGE` | LLM judge in benchmarks |
+| `ENABLE_PUBLIC_HEALTH` | `/v1/health` without API key |
+
+Also: `SECTION_STORE_PROVIDER`, `VECTOR_STORE_PROVIDER`, `MAX_QUERY_CHARS`, `MAX_UPLOAD_MB`.
+
+Validation at startup/health: provider IDs, required keys/base URLs, embedding dimension probe, hybrid dependency, FAISS load status.
 
 ## Benchmark
 
-- `ModelProfile` + same index/`k_*` for comparison; CI with mocked LLM/embedding; live runs flagged (`pytest -m live_models` or CLI).
+- `ModelProfile` + same index/`k_*` for comparison; mock runs in pre-push pre-commit; live runs via `pytest -m live_models` or CLI `--live`.
 - Artifacts under `benchmarks/out/` (JSON/CSV); no proprietary datasets in repo — BYO questions/gold metadata.
 
 ## Quality and Security
 
-- Validate file type and size; no arbitrary file writing outside of `INDEX_DIR` / configured index path.
-- Structured logging without PII leakage; optional `X-API-Key` for the service where appropriate.
+- Validate file type and size; no arbitrary file writing outside `INDEX_DIR`.
+- Structured logging without PII leakage (do not log raw `question` text at info level).
+- Optional `X-API-Key` for the service.
 
-## Not in the First Iteration
+## Not in Scope
 
-- Full FinanceBench reproduction; horizontal scaling of the index beyond a single process/FAISS file — not a goal for the template.
+- Full FinanceBench reproduction; horizontal scaling of the index beyond a single process/FAISS file.

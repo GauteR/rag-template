@@ -1,0 +1,52 @@
+---
+description: Local development, CI, pre-commit, testing, and PR conventions for rag-template.
+alwaysApply: true
+---
+
+# Development Workflow — rag-template
+
+## CI vs pre-commit (important)
+
+- **GitHub Actions** (`.github/workflows/ci.yml`) runs **lint only**: ruff check, ruff format, import-linter.
+- **Do not add pytest or benchmark CLI to GitHub Actions** unless the user explicitly asks for it.
+- **Tests and mock benchmark** belong in **pre-commit pre-push hooks** (`.pre-commit-config.yaml`).
+- **`scripts/ci.sh`** mirrors the full local gate: pre-commit (commit hooks) + pre-commit (pre-push hooks).
+
+Hook stages:
+
+| Stage | What runs |
+|-------|-----------|
+| `pre-commit` | ruff, ruff-format, import-linter |
+| `pre-push` | pytest (`not live_models`), benchmark mock CLI |
+
+## Running checks locally
+
+```bash
+uv sync --python 3.11 --extra dev --extra faiss --extra chroma
+uv run pre-commit install
+uv run pre-commit install --hook-type pre-push
+bash scripts/ci.sh
+```
+
+`pytest-cov` enforces 70 % coverage on pre-push via `pyproject.toml` `[tool.coverage.report]`.
+
+## Local `.env` and tests
+
+- `Settings` loads `.env` by default. A dev `.env` with e.g. `LLM_PROVIDER=ollama` can break tests that expect `echo`/`hash`.
+- API/unit tests should pass explicit `Settings(...)` overrides for provider-related fields when isolation matters.
+- Live provider tests use `@pytest.mark.live_models` and are excluded from pre-push.
+
+## Merge / integration pitfalls
+
+When resolving conflicts across stacked PRs, verify:
+
+- `container.query_use_case` and `container.index_markdown_use_case` are **properties** (`@cached_property`), never called as `query_use_case()`.
+- `collect_config_errors()` includes FAISS-unavailable warning when `VECTOR_STORE_PROVIDER=faiss`.
+- Atomic indexing tests (`test_reindex_preserves_*`) remain in `tests/test_indexing_and_query.py`.
+- Routes use `container.query_use_case.execute(...)`, not `container.query_use_case().execute(...)`.
+
+## PR conventions
+
+- Keep PRs small (target ≤ 500 lines changed).
+- One concern per branch; stack dependent PRs on their base branch when needed.
+- Document QA steps in the PR body.

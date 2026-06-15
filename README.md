@@ -16,8 +16,10 @@ answer through a configurable LLM provider.
 Create the environment and install project dependencies:
 
 ```bash
-uv sync --python 3.11 --extra dev --extra faiss
+uv sync --python 3.11 --extra dev --extra faiss --extra chroma
 ```
+
+The `chroma` extra is needed for the full pre-push test suite. For API runtime only, `--extra faiss` is enough.
 
 Copy the example environment file:
 
@@ -107,7 +109,7 @@ The indexing pipeline:
 2. Chunks content within section boundaries.
 3. Injects breadcrumb context into embedding text.
 4. Filters noisy sections with a heuristic by default.
-5. Stores vectors and full section text for pointer retrieval.
+5. Stores vectors and full section text via atomic `replace_document` (safe re-indexing).
 
 ## Query
 
@@ -146,6 +148,7 @@ EMBEDDING_PROVIDER=hash
 EMBEDDING_DIMENSION=8
 
 VECTOR_STORE_PROVIDER=faiss
+SECTION_STORE_PROVIDER=json
 CHROMA_HOST=localhost
 CHROMA_PORT=8000
 CHROMA_COLLECTION=rag_template
@@ -153,19 +156,23 @@ CHROMA_COLLECTION=rag_template
 ENABLE_LLM_NOISE_FILTER=false
 ENABLE_LLM_RERANKER=false
 ENABLE_LLAMAPARSE=true
+ENABLE_PDF_INDEXING=true
 ENABLE_BENCHMARK_JUDGE=false
 ENABLE_INDEX_ADMIN=false
 ENABLE_QUERY_TRACING=false
 ENABLE_STREAMING_QUERY=false
 ENABLE_HYBRID_SEARCH=false
+ENABLE_PUBLIC_HEALTH=true
 
 INDEX_DIR=.index
 MAX_UPLOAD_MB=5
+MAX_QUERY_CHARS=4000
 API_KEY=
 ```
 
 FAISS vectors are persisted under `INDEX_DIR` as `vectors.faiss` (with companion
-`vectors.records.json` metadata) so indexed content survives service restarts.
+`vectors.records.json` metadata). Sections are stored in `sections.json` when
+`SECTION_STORE_PROVIDER=json`.
 
 ### Provider matrix
 
@@ -179,12 +186,17 @@ FAISS vectors are persisted under `INDEX_DIR` as `vectors.faiss` (with companion
 | `faiss` | vector store | `INDEX_DIR` | matches embedding dim |
 | `chroma` | vector store | `CHROMA_HOST`, `CHROMA_PORT` | matches embedding dim |
 | `memory` | vector store | none | in-memory only |
+| `json` | section store | `INDEX_DIR` | persisted sections |
+| `memory` | section store | none | in-memory only |
 
-When `API_KEY` is set, requests must include:
+When `API_KEY` is set, protected routes require:
 
 ```bash
 X-API-Key: your-key
 ```
+
+`/v1/health` is public by default (`ENABLE_PUBLIC_HEALTH=true`). Set
+`ENABLE_PUBLIC_HEALTH=false` to require the API key on health as well.
 
 ## Provider Examples
 
@@ -229,7 +241,7 @@ CHROMA_HOST=localhost
 CHROMA_PORT=8001
 ```
 
-Hybrid BM25 + vector retrieval:
+Hybrid BM25 + vector retrieval (Reciprocal Rank Fusion):
 
 ```bash
 ENABLE_HYBRID_SEARCH=true
@@ -238,12 +250,14 @@ uv sync --python 3.11 --extra dev --extra hybrid
 
 ## PDF Indexing
 
-`POST /v1/index/pdf` is enabled by default through `ENABLE_LLAMAPARSE=true`.
+`POST /v1/index/pdf` is controlled by `ENABLE_PDF_INDEXING=true` (default).
 
 The route accepts multipart form data and runs: PDF bytes → Markdown → existing indexing pipeline.
-With `LLAMA_CLOUD_API_KEY` configured (and the `llamaparse` extra installed), extraction uses
-LlamaParse for richer content such as math, tables, images, and complex layout. Without that
-configuration, it falls back to local text extraction with `pypdf`.
+When `ENABLE_LLAMAPARSE=true` and `LLAMA_CLOUD_API_KEY` is set (with the `llamaparse` extra
+installed), extraction uses LlamaParse for richer content such as math, tables, images, and complex
+layout. Otherwise it falls back to local text extraction with `pypdf`.
+
+Uploads are validated with a `%PDF-` header and `MAX_UPLOAD_MB`.
 
 Example:
 
@@ -322,12 +336,15 @@ Artifacts are written to `benchmarks/out/` as JSON and CSV.
 Installer hooks én gang:
 
 ```bash
-uv sync --python 3.11 --extra dev --extra faiss
+uv sync --python 3.11 --extra dev --extra faiss --extra chroma
 uv run pre-commit install
 uv run pre-commit install --hook-type pre-push
 ```
 
-Ved **commit** kjøres ruff (lint + format) og import-linter. Ved **push** kjøres i tillegg pytest og mock-benchmark.
+| Hook stage | Checks |
+|------------|--------|
+| `pre-commit` | ruff (lint + format), import-linter |
+| `pre-push` | pytest (`not live_models`, 70 % coverage), benchmark mock CLI |
 
 Kjør alle sjekker manuelt:
 
@@ -340,7 +357,7 @@ Konfigurasjon: [`.pre-commit-config.yaml`](.pre-commit-config.yaml)
 
 ### Full CI-script
 
-Samme sjekker som pre-commit, samlet i ett script:
+Samme sjekker som pre-commit (inkl. tester), samlet i ett script:
 
 ```bash
 bash scripts/ci.sh
@@ -352,6 +369,10 @@ On Windows:
 ./scripts/ci.ps1
 ```
 
+**Merk:** En lokal `.env` med f.eks. `LLM_PROVIDER=ollama` kan påvirke tester som forventer
+default `echo`/`hash`. Bruk eksplisitte `Settings(...)` i tester eller midlertidig `.env` uten
+provider-overrides ved feilsøking.
+
 Live provider tests (optional, not in pre-commit):
 
 ```bash
@@ -360,4 +381,13 @@ RUN_LIVE_MODELS=1 uv run --python 3.11 --extra dev pytest -m live_models
 
 ## CI on GitHub
 
-A reference workflow lives in [`.github/workflows/ci.yml`](.github/workflows/ci.yml). It is not required if Actions is unavailable in your GitHub org — use pre-commit or `scripts/ci.sh` locally instead.
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs **lint only** on push/PR:
+
+- ruff check
+- ruff format
+- import-linter
+
+**Tester og mock-benchmark kjøres ikke i GitHub Actions** — de ligger i pre-commit pre-push hooks
+og `scripts/ci.sh`. Dette er bevisst: full verifikasjon skjer lokalt ved push.
+
+If Actions is unavailable in your GitHub org, use pre-commit or `scripts/ci.sh` locally instead.

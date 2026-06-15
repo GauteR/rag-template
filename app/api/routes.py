@@ -226,7 +226,7 @@ def query(
         question=request.question,
         max_chars=container.settings.max_query_chars,
     )
-    result = container.query_use_case().execute(
+    result = container.query_use_case.execute(
         question=request.question,
         k_recall=request.k_recall,
         k_candidates=request.k_candidates,

@@ -59,6 +59,11 @@ class AppContainer:
             errors.append(self._embedding_probe_error)
         if self.settings.enable_hybrid_search:
             errors.extend(self._hybrid_search_config_errors())
+        if self.settings.vector_store_provider == "faiss" and not self.faiss_available():
+            errors.append(
+                "VECTOR_STORE_PROVIDER=faiss but FAISS is not loaded. "
+                "Install with: uv sync --extra faiss"
+            )
         return errors
 
     def _hybrid_search_config_errors(self) -> list[str]:

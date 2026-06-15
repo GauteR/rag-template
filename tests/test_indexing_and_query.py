@@ -342,3 +342,66 @@ def test_query_filters_by_min_score() -> None:
     assert len(response.sources) == 1
     assert response.sources[0].node_id == "manual:n2"
     assert response.sources[0].score >= 0.5
+
+
+def test_reindex_preserves_existing_vectors_when_replace_fails(tmp_path, monkeypatch) -> None:
+    index_path = tmp_path / "vectors.faiss"
+    vector_store = FaissVectorStore(dimension=1, index_path=index_path)
+    section_store = InMemorySectionStore()
+    use_case = IndexMarkdownUseCase(
+        parser=MarkdownSkeletonParser(),
+        chunker=StructureGuidedChunker(),
+        embedder=KeywordEmbedder(),
+        vector_store=vector_store,
+        section_source=section_store,
+    )
+    use_case.execute(
+        doc_id="manual",
+        markdown="# Intro\nWelcome\n\n## Install\nInstall with uv",
+    )
+    original_count = vector_store.count()
+
+    def fail_save(_self) -> None:
+        raise OSError("simulated persistence failure")
+
+    monkeypatch.setattr(FaissVectorStore, "_save", fail_save)
+
+    with pytest.raises(OSError, match="simulated persistence failure"):
+        use_case.execute(doc_id="manual", markdown="# Query\nAsk questions")
+
+    assert vector_store.count() == original_count
+    assert section_store.get_section("manual", "manual:n2").text == "## Install\nInstall with uv"
+
+
+class FailOnReplaceVectorStore(InMemoryVectorStore):
+    def __init__(self) -> None:
+        super().__init__()
+        self.fail_on_replace = False
+
+    def replace_document(self, doc_id: str, records: list[VectorRecord]) -> None:
+        if self.fail_on_replace:
+            raise RuntimeError("simulated replace failure")
+        super().replace_document(doc_id, records)
+
+
+def test_reindex_preserves_existing_vectors_when_in_memory_replace_fails() -> None:
+    vector_store = FailOnReplaceVectorStore()
+    section_store = InMemorySectionStore()
+    use_case = IndexMarkdownUseCase(
+        parser=MarkdownSkeletonParser(),
+        chunker=StructureGuidedChunker(),
+        embedder=KeywordEmbedder(),
+        vector_store=vector_store,
+        section_source=section_store,
+    )
+    use_case.execute(
+        doc_id="manual",
+        markdown="# Intro\nWelcome\n\n## Install\nInstall with uv",
+    )
+    vector_store.fail_on_replace = True
+
+    with pytest.raises(RuntimeError, match="simulated replace failure"):
+        use_case.execute(doc_id="manual", markdown="# Query\nAsk questions")
+
+    assert vector_store.count() == 2
+    assert section_store.get_section("manual", "manual:n2").text == "## Install\nInstall with uv"

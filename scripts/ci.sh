@@ -7,7 +7,7 @@ cd "$ROOT"
 PYTHON="${PYTHON:-3.11}"
 
 echo "==> uv sync"
-uv sync --python "$PYTHON" --extra dev --extra faiss
+uv sync --python "$PYTHON" --extra dev --extra faiss --extra chroma
 
 echo "==> pre-commit (commit hooks)"
 uv run pre-commit run --all-files

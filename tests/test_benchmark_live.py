@@ -7,6 +7,7 @@ import pytest
 _BENCHMARKS_DIR = Path(__file__).parent.parent / "benchmarks"
 
 
+@pytest.mark.live_models
 def test_seed_index_and_live_benchmark(tmp_path: Path) -> None:
     pytest.importorskip("yaml")
 

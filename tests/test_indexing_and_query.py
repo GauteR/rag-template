@@ -266,3 +266,78 @@ def test_section_without_offset_metadata_serializes_successfully(tmp_path) -> No
     assert section.citation is not None
     assert section.start_offset == 0
     assert section.end_offset == len("plain text without headings")
+
+
+def test_query_filters_by_doc_id() -> None:
+    vector_store = InMemoryVectorStore()
+    section_store = InMemorySectionStore()
+    index_use_case = IndexMarkdownUseCase(
+        parser=MarkdownSkeletonParser(),
+        chunker=StructureGuidedChunker(),
+        embedder=KeywordEmbedder(),
+        vector_store=vector_store,
+        section_source=section_store,
+    )
+    index_use_case.execute(
+        doc_id="manual-a",
+        markdown="# Intro\nWelcome\n\n## Install\nInstall with uv",
+    )
+    index_use_case.execute(
+        doc_id="manual-b",
+        markdown="# Guide\nAsk questions",
+    )
+    query_use_case = QueryUseCase(
+        embedder=KeywordEmbedder(),
+        vector_store=vector_store,
+        section_source=section_store,
+        synthesis_llm=None,
+        reranker_llm=None,
+        enable_llm_reranker=False,
+    )
+
+    response = query_use_case.execute(
+        question="How do I install?",
+        k_recall=10,
+        k_candidates=5,
+        k_final=1,
+        doc_id="manual-a",
+    )
+
+    assert response.sources[0].doc_id == "manual-a"
+    assert response.sources[0].node_id == "manual-a:n2"
+
+
+def test_query_filters_by_min_score() -> None:
+    vector_store = InMemoryVectorStore()
+    section_store = InMemorySectionStore()
+    index_use_case = IndexMarkdownUseCase(
+        parser=MarkdownSkeletonParser(),
+        chunker=StructureGuidedChunker(),
+        embedder=KeywordEmbedder(),
+        vector_store=vector_store,
+        section_source=section_store,
+    )
+    index_use_case.execute(
+        doc_id="manual",
+        markdown="# Intro\nWelcome\n\n## Install\nInstall with uv",
+    )
+    query_use_case = QueryUseCase(
+        embedder=KeywordEmbedder(),
+        vector_store=vector_store,
+        section_source=section_store,
+        synthesis_llm=None,
+        reranker_llm=None,
+        enable_llm_reranker=False,
+    )
+
+    response = query_use_case.execute(
+        question="How do I install?",
+        k_recall=10,
+        k_candidates=5,
+        k_final=5,
+        min_score=0.5,
+    )
+
+    assert len(response.sources) == 1
+    assert response.sources[0].node_id == "manual:n2"
+    assert response.sources[0].score >= 0.5

@@ -192,15 +192,27 @@ class QueryUseCase:
         self,
         vector_hits: list[SearchHit],
         lexical_hits: list[SearchHit],
+        *,
+        rrf_k: int = 60,
     ) -> list[SearchHit]:
-        # Vector cosine scores and BM25 scores use different scales; keep the higher raw score.
-        merged: dict[tuple[str, str], SearchHit] = {}
-        for hit in vector_hits + lexical_hits:
+        # Reciprocal Rank Fusion avoids comparing incompatible raw score scales.
+        rrf_scores: dict[tuple[str, str], float] = {}
+        hit_by_key: dict[tuple[str, str], SearchHit] = {}
+
+        for rank, hit in enumerate(vector_hits, start=1):
             key = (hit.record.doc_id, hit.record.node_id)
-            existing = merged.get(key)
-            if existing is None or hit.score > existing.score:
-                merged[key] = hit
-        return sorted(merged.values(), key=lambda item: item.score, reverse=True)
+            rrf_scores[key] = rrf_scores.get(key, 0.0) + 1.0 / (rrf_k + rank)
+            hit_by_key.setdefault(key, hit)
+
+        for rank, hit in enumerate(lexical_hits, start=1):
+            key = (hit.record.doc_id, hit.record.node_id)
+            rrf_scores[key] = rrf_scores.get(key, 0.0) + 1.0 / (rrf_k + rank)
+            hit_by_key.setdefault(key, hit)
+
+        return [
+            SearchHit(record=hit_by_key[key].record, score=score)
+            for key, score in sorted(rrf_scores.items(), key=lambda item: item[1], reverse=True)
+        ]
 
     def _dedupe_nodes(self, hits: list[SearchHit]) -> list[SearchHit]:
         seen: set[tuple[str, str]] = set()

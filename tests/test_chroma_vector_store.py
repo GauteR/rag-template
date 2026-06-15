@@ -99,6 +99,35 @@ def test_chroma_vector_store_deletes_by_doc_id_and_maps_search_hits() -> None:
     ]
 
 
+def test_chroma_vector_store_clamps_negative_similarity_scores() -> None:
+    collection = FakeCollection()
+
+    def query_with_large_distance(**kwargs) -> dict[str, object]:
+        return {
+            "ids": [["doc:n1:c1"]],
+            "distances": [[1.5]],
+            "documents": [["chunk text"]],
+            "metadatas": [
+                [
+                    {
+                        "doc_id": "doc",
+                        "node_id": "doc:n1",
+                        "chunk_id": "doc:n1:c1",
+                        "breadcrumb": "Root",
+                    }
+                ]
+            ],
+            "embeddings": [[[1.0, 0.0]]],
+        }
+
+    collection.query = query_with_large_distance  # type: ignore[method-assign]
+    store = ChromaVectorStore(collection=collection)
+
+    hits = store.search([1.0, 0.0], limit=1)
+
+    assert hits[0].score == 0.0
+
+
 def test_chroma_vector_store_count_and_doc_ids() -> None:
     collection = FakeCollection()
     store = ChromaVectorStore(collection=collection)

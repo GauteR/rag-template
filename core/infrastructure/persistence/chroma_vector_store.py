@@ -135,7 +135,7 @@ class ChromaVectorStore(VectorStorePort):
                             else ()
                         ),
                     ),
-                    score=1.0 - float(distance),
+                    score=max(0.0, min(1.0, 1.0 - float(distance))),
                 )
             )
         return hits

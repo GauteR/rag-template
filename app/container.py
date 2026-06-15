@@ -50,7 +50,19 @@ class AppContainer:
             errors.append(str(exc))
         if self._embedding_probe_error is not None:
             errors.append(self._embedding_probe_error)
+        if self.settings.enable_hybrid_search:
+            errors.extend(self._hybrid_search_config_errors())
         return errors
+
+    def _hybrid_search_config_errors(self) -> list[str]:
+        import importlib.util
+
+        if importlib.util.find_spec("rank_bm25") is None:
+            return [
+                "ENABLE_HYBRID_SEARCH is true but rank-bm25 is not installed. "
+                "Install with: uv sync --extra hybrid"
+            ]
+        return []
 
     @cached_property
     def embedder(self):

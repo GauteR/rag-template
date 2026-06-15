@@ -13,6 +13,10 @@ class InMemoryVectorStore(VectorStorePort):
     def add(self, records: list[VectorRecord]) -> None:
         self._records.extend(records)
 
+    def replace_document(self, doc_id: str, records: list[VectorRecord]) -> None:
+        self._records = [record for record in self._records if record.doc_id != doc_id]
+        self._records.extend(records)
+
     def delete_document(self, doc_id: str) -> None:
         self._records = [record for record in self._records if record.doc_id != doc_id]
 

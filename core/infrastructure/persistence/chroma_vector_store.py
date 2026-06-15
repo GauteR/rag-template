@@ -39,6 +39,10 @@ class ChromaVectorStore(VectorStorePort):
             ],
         )
 
+    def replace_document(self, doc_id: str, records: list[VectorRecord]) -> None:
+        self.delete_document(doc_id)
+        self.add(records)
+
     def delete_document(self, doc_id: str) -> None:
         self._collection.delete(where={"doc_id": doc_id})
 

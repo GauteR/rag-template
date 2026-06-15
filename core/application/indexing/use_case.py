@@ -49,12 +49,8 @@ class IndexMarkdownUseCase:
             )
             for chunk, embedding in zip(chunks, embeddings, strict=True)
         ]
-        self._section_source.delete_document(doc_id)
-        self._vector_store.delete_document(doc_id)
-        if self._lexical_store is not None:
-            self._lexical_store.delete_document(doc_id)
-        self._section_source.store_document(document)
-        self._vector_store.add(records)
+        self._vector_store.replace_document(doc_id, records)
+        self._section_source.replace_document(document)
         if self._lexical_store is not None:
             self._lexical_store.index_document(
                 doc_id=doc_id,

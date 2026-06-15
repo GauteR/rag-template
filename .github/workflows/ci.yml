@@ -26,7 +26,12 @@ jobs:
         run: uv python install 3.11
 
       - name: Install dependencies
-        run: uv sync --python 3.11 --extra dev --extra faiss
+        run: uv sync --python 3.11 --extra dev --extra faiss --extra chroma
+
+      - name: Pre-commit
+        run: |
+          uv run pre-commit run --all-files
+          uv run pre-commit run --all-files --hook-stage pre-push
 
       - name: Ruff check
         run: uv run --python 3.11 --extra dev ruff check .
@@ -38,7 +43,7 @@ jobs:
         run: uv run --python 3.11 --extra dev lint-imports
 
       - name: Pytest
-        run: uv run --python 3.11 --extra dev --extra faiss pytest -m "not live_models"
+        run: uv run --python 3.11 --extra dev --extra faiss --extra chroma pytest -m "not live_models" --cov-fail-under=70
 
       - name: Benchmark mock CLI
         run: uv run --python 3.11 --extra dev python benchmarks/run_matrix.py --mock

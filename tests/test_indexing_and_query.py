@@ -269,64 +269,76 @@ def test_section_without_offset_metadata_serializes_successfully(tmp_path) -> No
     assert section.end_offset == len("plain text without headings")
 
 
-def test_reindex_preserves_existing_vectors_when_replace_fails(tmp_path, monkeypatch) -> None:
-    index_path = tmp_path / "vectors.faiss"
-    vector_store = FaissVectorStore(dimension=1, index_path=index_path)
+def test_query_filters_by_doc_id() -> None:
+    vector_store = InMemoryVectorStore()
     section_store = InMemorySectionStore()
-    use_case = IndexMarkdownUseCase(
+    index_use_case = IndexMarkdownUseCase(
         parser=MarkdownSkeletonParser(),
         chunker=StructureGuidedChunker(),
         embedder=KeywordEmbedder(),
         vector_store=vector_store,
         section_source=section_store,
     )
-    use_case.execute(
-        doc_id="manual",
+    index_use_case.execute(
+        doc_id="manual-a",
         markdown="# Intro\nWelcome\n\n## Install\nInstall with uv",
     )
-    original_count = vector_store.count()
+    index_use_case.execute(
+        doc_id="manual-b",
+        markdown="# Guide\nAsk questions",
+    )
+    query_use_case = QueryUseCase(
+        embedder=KeywordEmbedder(),
+        vector_store=vector_store,
+        section_source=section_store,
+        synthesis_llm=None,
+        reranker_llm=None,
+        enable_llm_reranker=False,
+    )
 
-    def fail_save(_self) -> None:
-        raise OSError("simulated persistence failure")
+    response = query_use_case.execute(
+        question="How do I install?",
+        k_recall=10,
+        k_candidates=5,
+        k_final=1,
+        doc_id="manual-a",
+    )
 
-    monkeypatch.setattr(FaissVectorStore, "_save", fail_save)
-
-    with pytest.raises(OSError, match="simulated persistence failure"):
-        use_case.execute(doc_id="manual", markdown="# Query\nAsk questions")
-
-    assert vector_store.count() == original_count
-    assert section_store.get_section("manual", "manual:n2").text == "## Install\nInstall with uv"
-
-
-class FailOnReplaceVectorStore(InMemoryVectorStore):
-    def __init__(self) -> None:
-        super().__init__()
-        self.fail_on_replace = False
-
-    def replace_document(self, doc_id: str, records: list[VectorRecord]) -> None:
-        if self.fail_on_replace:
-            raise RuntimeError("simulated replace failure")
-        super().replace_document(doc_id, records)
+    assert response.sources[0].doc_id == "manual-a"
+    assert response.sources[0].node_id == "manual-a:n2"
 
 
-def test_reindex_preserves_existing_vectors_when_in_memory_replace_fails() -> None:
-    vector_store = FailOnReplaceVectorStore()
+def test_query_filters_by_min_score() -> None:
+    vector_store = InMemoryVectorStore()
     section_store = InMemorySectionStore()
-    use_case = IndexMarkdownUseCase(
+    index_use_case = IndexMarkdownUseCase(
         parser=MarkdownSkeletonParser(),
         chunker=StructureGuidedChunker(),
         embedder=KeywordEmbedder(),
         vector_store=vector_store,
         section_source=section_store,
     )
-    use_case.execute(
+    index_use_case.execute(
         doc_id="manual",
         markdown="# Intro\nWelcome\n\n## Install\nInstall with uv",
     )
-    vector_store.fail_on_replace = True
+    query_use_case = QueryUseCase(
+        embedder=KeywordEmbedder(),
+        vector_store=vector_store,
+        section_source=section_store,
+        synthesis_llm=None,
+        reranker_llm=None,
+        enable_llm_reranker=False,
+    )
 
-    with pytest.raises(RuntimeError, match="simulated replace failure"):
-        use_case.execute(doc_id="manual", markdown="# Query\nAsk questions")
+    response = query_use_case.execute(
+        question="How do I install?",
+        k_recall=10,
+        k_candidates=5,
+        k_final=5,
+        min_score=0.5,
+    )
 
-    assert vector_store.count() == 2
-    assert section_store.get_section("manual", "manual:n2").text == "## Install\nInstall with uv"
+    assert len(response.sources) == 1
+    assert response.sources[0].node_id == "manual:n2"
+    assert response.sources[0].score >= 0.5

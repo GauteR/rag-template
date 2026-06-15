@@ -21,6 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.2",
+    "pytest-cov>=5.0",
     "pyyaml>=6.0",
     "ruff>=0.5",
     "import-linter>=2.0",
@@ -47,9 +48,17 @@ include = ["app*", "core*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--cov=app --cov=core --cov-report=term-missing:skip-covered"
 markers = [
     "live_models: tests that call live LLM or embedding providers",
 ]
+
+[tool.coverage.run]
+omit = ["tests/*", "benchmarks/*"]
+
+[tool.coverage.report]
+fail_under = 70
+show_missing = true
 
 [tool.ruff]
 line-length = 100
